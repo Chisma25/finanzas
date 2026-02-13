@@ -514,6 +514,7 @@ class FinanzasApp(tk.Tk):
         self._set_style()
         self._build_ui()
         self.refresh_all()
+        self.after_idle(self.refresh_all)
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
     def _set_style(self) -> None:
@@ -617,6 +618,14 @@ class FinanzasApp(tk.Tk):
         graph_frame.pack(fill="both", expand=True, pady=(10, 0))
         self.chart_canvas = tk.Canvas(graph_frame, bg="#FFFFFF", height=260, highlightthickness=0)
         self.chart_canvas.pack(fill="both", expand=True, padx=8, pady=8)
+        self._chart_redraw_job: str | None = None
+        self.chart_canvas.bind("<Configure>", self.on_chart_canvas_resize)
+
+    def on_chart_canvas_resize(self, _event: tk.Event) -> None:
+        """Redibuja la gráfica cuando el canvas termina de ajustarse al layout."""
+        if self._chart_redraw_job is not None:
+            self.after_cancel(self._chart_redraw_job)
+        self._chart_redraw_job = self.after(60, self.draw_monthly_chart)
 
     def _build_movimientos_tab(self) -> None:
         top = ttk.LabelFrame(self.mov_tab, text=" Nuevo movimiento ", style="Card.TLabelframe", padding=10)
