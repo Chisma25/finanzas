@@ -100,6 +100,13 @@ def init_db(conn: sqlite3.Connection) -> None:
         )
         """
     )
+    ensure_column(conn, "inversiones", "clave", "clave TEXT")
+    ensure_column(conn, "inversiones", "fecha_actualizacion", "fecha_actualizacion TEXT")
+    ensure_column(conn, "inversiones", "notas", "notas TEXT")
+
+    migrate_investments_legacy_data(conn)
+
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_inversiones_clave ON inversiones(clave)")
 
     conn.execute(
         """
@@ -124,6 +131,63 @@ def init_db(conn: sqlite3.Connection) -> None:
         """
     )
     conn.commit()
+
+
+def migrate_investments_legacy_data(conn: sqlite3.Connection) -> None:
+    """Migra bases antiguas sin `clave`/`fecha_actualizacion` y consolida duplicados por activo."""
+    rows = conn.execute(
+        """
+        SELECT id, nombre, tipo, broker, monto_invertido, valor_actual, riesgo,
+               COALESCE(fecha_actualizacion, '') AS fecha_actualizacion,
+               COALESCE(clave, '') AS clave
+        FROM inversiones
+        ORDER BY id
+        """
+    ).fetchall()
+
+    if not rows:
+        return
+
+    grouped: dict[str, list[sqlite3.Row]] = {}
+    for row in rows:
+        normalized = normalize_asset(row["nombre"])
+        grouped.setdefault(normalized, []).append(row)
+
+    today = date.today().isoformat()
+
+    for normalized, items in grouped.items():
+        keeper = items[0]
+        total_invertido = sum(float(r["monto_invertido"] or 0) for r in items)
+        total_actual = sum(float(r["valor_actual"] or 0) for r in items)
+
+        broker = ""
+        tipo = keeper["tipo"] or "Acción"
+        riesgo = keeper["riesgo"] or "Medio"
+        fecha_act = keeper["fecha_actualizacion"] or today
+        for candidate in items:
+            if not broker and candidate["broker"]:
+                broker = candidate["broker"]
+            if not candidate["fecha_actualizacion"]:
+                continue
+            fecha_act = candidate["fecha_actualizacion"]
+
+        conn.execute(
+            """
+            UPDATE inversiones
+            SET clave = ?,
+                tipo = ?,
+                broker = ?,
+                monto_invertido = ?,
+                valor_actual = ?,
+                riesgo = ?,
+                fecha_actualizacion = ?
+            WHERE id = ?
+            """,
+            (normalized, tipo, broker, total_invertido, total_actual, riesgo, fecha_act, keeper["id"]),
+        )
+
+        for duplicate in items[1:]:
+            conn.execute("DELETE FROM inversiones WHERE id = ?", (duplicate["id"],))
 
 
 def parse_iso_date(text: str) -> date:
