@@ -373,6 +373,15 @@ def apply_recurring_entries(conn: sqlite3.Connection, today: date | None = None)
     return result
 
 
+def reset_all_data(conn: sqlite3.Connection) -> None:
+    """Borra todos los datos funcionales de la app conservando el esquema."""
+    conn.execute("DELETE FROM transacciones")
+    conn.execute("DELETE FROM cuentas")
+    conn.execute("DELETE FROM inversiones")
+    conn.execute("DELETE FROM recurrencias")
+    conn.commit()
+
+
 class EditAccountDialog(tk.Toplevel):
     def __init__(self, parent: tk.Misc, data: sqlite3.Row):
         super().__init__(parent)
@@ -551,6 +560,11 @@ class FinanzasApp(tk.Tk):
 
         ttk.Button(filters, text="Aplicar periodo", command=self.refresh_all, style="Accent.TButton").pack(side="left")
         ttk.Button(filters, text="Aplicar recurrencias ahora", command=self.apply_recurrences_now).pack(side="left", padx=(8, 0))
+        ttk.Button(
+            filters,
+            text="Resetear base de datos",
+            command=self.reset_database_with_confirmation,
+        ).pack(side="right")
 
         self.notebook = ttk.Notebook(root)
         self.notebook.pack(fill="both", expand=True)
@@ -773,6 +787,7 @@ class FinanzasApp(tk.Tk):
         self.inv_tree.configure(yscrollcommand=scr.set)
         self.inv_tree.pack(side="left", fill="both", expand=True)
         scr.pack(side="right", fill="y")
+        self.inv_tree.bind("<Double-1>", lambda _event: self.quick_update_investment_value())
 
         actions = ttk.Frame(self.investments_tab)
         actions.pack(fill="x", pady=(8, 0))
@@ -1434,6 +1449,25 @@ class FinanzasApp(tk.Tk):
         result = apply_recurring_entries(self.conn)
         self.refresh_all()
         messagebox.showinfo("Recurrencias", f"Generadas: {result.created}\nSaltadas por fondos insuficientes: {result.skipped}")
+
+    def reset_database_with_confirmation(self) -> None:
+        if not messagebox.askyesno(
+            "Resetear base de datos",
+            "Esto borrará TODOS los movimientos, cuentas, inversiones y recurrencias. ¿Deseas continuar?",
+        ):
+            return
+
+        keyword = simpledialog.askstring(
+            "Confirmación final",
+            "Escribe RESET para confirmar el borrado total:",
+        )
+        if keyword != "RESET":
+            messagebox.showinfo("Cancelado", "No se realizaron cambios.")
+            return
+
+        reset_all_data(self.conn)
+        self.refresh_all()
+        messagebox.showinfo("Base de datos reseteada", "Todos los datos fueron eliminados correctamente.")
 
     def on_close(self) -> None:
         self.conn.close()

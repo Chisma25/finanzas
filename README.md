@@ -35,6 +35,7 @@ python3 finanzas_gui.py
   - Alta de aportes
   - Acumulación automática por activo (ej. NVIDIA)
   - Edición de posición y actualización de valor actual (cotización)
+  - Doble clic sobre una posición para actualizar rápido su valor actual
   - Rentabilidad agregada y composición por tipo
   - Inversión recurrente mensual opcional
 - **Recurrencias:**
@@ -42,6 +43,8 @@ python3 finanzas_gui.py
   - Activar/desactivar
   - Eliminar
   - Aplicación mensual automática y manual
+- **Reset global de datos:**
+  - Botón "Resetear base de datos" con doble confirmación (`RESET`) para limpiar valores de prueba.
 
 ## 2) CLI (opcional)
 
