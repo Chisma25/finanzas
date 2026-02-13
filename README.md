@@ -2,7 +2,7 @@
 
 Aplicación de finanzas personales para uso local con dos interfaces:
 
-- **GUI avanzada (Tkinter):** panel visual, movimientos por mes/año, cuentas e inversiones.
+- **GUI avanzada (Tkinter):** panel visual, movimientos por mes/año, cuentas, inversiones y recurrencias.
 - **CLI:** para automatizar o cargar datos rápido por terminal.
 
 Base de datos local: `~/.mis_finanzas.db` (SQLite).
@@ -13,28 +13,35 @@ Base de datos local: `~/.mis_finanzas.db` (SQLite).
 python3 finanzas_gui.py
 ```
 
-### Funcionalidades de la GUI
+### Funcionalidades clave
 
-- **Resumen visual** con métricas clave:
-  - Balance mensual
-  - Ingresos y gastos del periodo
+- **Resumen visual** con:
+  - Balance, ingresos y gastos del periodo
   - Tasa de ahorro
-  - Saldo total en cuentas
-  - Capital invertido
-- **Filtro por mes y año** para revisar movimientos por periodos.
-- **Gráfico de evolución** de ingresos/gastos de los últimos 6 meses.
-- **Gestión de movimientos**:
-  - Alta con tipo, cuenta, categoría, fecha y descripción.
-  - Tabla filtrada por periodo.
-  - Eliminación individual.
-  - Exportación CSV mensual.
-- **Gestión de cuentas bancarias**:
-  - Alta de cuentas (nombre, banco, tipo, moneda, saldo).
-  - Tabla con saldo total agregado.
-- **Gestión de inversiones**:
-  - Alta de activos (tipo, broker, capital invertido, valor actual, riesgo).
-  - Resumen de rentabilidad total.
-  - Gráfico de composición de cartera por tipo.
+  - Saldo total de cuentas
+  - Valor total de cartera
+  - Gráfico de evolución de los últimos 6 meses
+- **Filtro por mes y año** para consultar movimientos por periodos.
+- **Control de liquidez (sin crédito):**
+  - Gastos e inversiones quedan limitados por dinero disponible.
+- **Movimientos:**
+  - Alta de ingresos/gastos con cuenta asociada
+  - Exportación CSV del mes
+  - Gasto recurrente mensual opcional
+- **Cuentas bancarias:**
+  - Alta, edición y eliminación
+  - Saldo agregado y actualización de datos
+- **Inversiones:**
+  - Alta de aportes
+  - Acumulación automática por activo (ej. NVIDIA)
+  - Edición de posición y actualización de valor actual (cotización)
+  - Rentabilidad agregada y composición por tipo
+  - Inversión recurrente mensual opcional
+- **Recurrencias:**
+  - Listado de reglas
+  - Activar/desactivar
+  - Eliminar
+  - Aplicación mensual automática y manual
 
 ## 2) CLI (opcional)
 
