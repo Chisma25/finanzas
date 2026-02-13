@@ -221,39 +221,87 @@ def upsert_investment(
     riesgo: str,
     fecha_text: str,
 ) -> None:
+    inv_columns = {row["name"] for row in conn.execute("PRAGMA table_info(inversiones)").fetchall()}
+    has_legacy_fecha = "fecha" in inv_columns
+
     clave = normalize_asset(nombre)
     current = conn.execute("SELECT * FROM inversiones WHERE clave = ?", (clave,)).fetchone()
 
     if current is None:
-        conn.execute(
-            """
-            INSERT INTO inversiones (nombre, clave, tipo, broker, monto_invertido, valor_actual, riesgo, fecha_actualizacion, notas)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, '')
-            """,
-            (nombre.strip(), clave, tipo, broker.strip(), invertido_delta, valor_actual_delta, riesgo, fecha_text),
-        )
+        if has_legacy_fecha:
+            conn.execute(
+                """
+                INSERT INTO inversiones
+                (nombre, clave, tipo, broker, monto_invertido, valor_actual, riesgo, fecha_actualizacion, fecha, notas)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '')
+                """,
+                (
+                    nombre.strip(),
+                    clave,
+                    tipo,
+                    broker.strip(),
+                    invertido_delta,
+                    valor_actual_delta,
+                    riesgo,
+                    fecha_text,
+                    fecha_text,
+                ),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO inversiones (nombre, clave, tipo, broker, monto_invertido, valor_actual, riesgo, fecha_actualizacion, notas)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, '')
+                """,
+                (nombre.strip(), clave, tipo, broker.strip(), invertido_delta, valor_actual_delta, riesgo, fecha_text),
+            )
     else:
-        conn.execute(
-            """
-            UPDATE inversiones
-            SET monto_invertido = monto_invertido + ?,
-                valor_actual = valor_actual + ?,
-                broker = ?,
-                tipo = ?,
-                riesgo = ?,
-                fecha_actualizacion = ?
-            WHERE id = ?
-            """,
-            (
-                invertido_delta,
-                valor_actual_delta,
-                broker.strip() or current["broker"],
-                tipo or current["tipo"],
-                riesgo or current["riesgo"],
-                fecha_text,
-                current["id"],
-            ),
-        )
+        if has_legacy_fecha:
+            conn.execute(
+                """
+                UPDATE inversiones
+                SET monto_invertido = monto_invertido + ?,
+                    valor_actual = valor_actual + ?,
+                    broker = ?,
+                    tipo = ?,
+                    riesgo = ?,
+                    fecha_actualizacion = ?,
+                    fecha = ?
+                WHERE id = ?
+                """,
+                (
+                    invertido_delta,
+                    valor_actual_delta,
+                    broker.strip() or current["broker"],
+                    tipo or current["tipo"],
+                    riesgo or current["riesgo"],
+                    fecha_text,
+                    fecha_text,
+                    current["id"],
+                ),
+            )
+        else:
+            conn.execute(
+                """
+                UPDATE inversiones
+                SET monto_invertido = monto_invertido + ?,
+                    valor_actual = valor_actual + ?,
+                    broker = ?,
+                    tipo = ?,
+                    riesgo = ?,
+                    fecha_actualizacion = ?
+                WHERE id = ?
+                """,
+                (
+                    invertido_delta,
+                    valor_actual_delta,
+                    broker.strip() or current["broker"],
+                    tipo or current["tipo"],
+                    riesgo or current["riesgo"],
+                    fecha_text,
+                    current["id"],
+                ),
+            )
 
 
 def apply_recurring_entries(conn: sqlite3.Connection, today: date | None = None) -> RecurrenceResult:
