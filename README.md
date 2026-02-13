@@ -1,25 +1,42 @@
-# Mis Finanzas (local, sin Excel)
+# Mis Finanzas (local, visual y serio)
 
-Ahora tienes **dos formas** de usar la app en local:
+Aplicación de finanzas personales para uso local con dos interfaces:
 
-1. **Interfaz gráfica (recomendada):** para trastear cómodamente.
-2. **CLI:** por si prefieres terminal.
+- **GUI avanzada (Tkinter):** panel visual, movimientos por mes/año, cuentas e inversiones.
+- **CLI:** para automatizar o cargar datos rápido por terminal.
 
-Los datos se guardan en SQLite en `~/.mis_finanzas.db`.
+Base de datos local: `~/.mis_finanzas.db` (SQLite).
 
-## Interfaz gráfica
+## 1) Interfaz gráfica (recomendada)
 
 ```bash
 python3 finanzas_gui.py
 ```
 
-Desde la ventana puedes:
-- Añadir transacciones (`ingreso` / `gasto`) con categoría, fecha y descripción.
-- Ver resumen de ingresos, gastos y balance.
-- Eliminar una transacción seleccionada.
-- Borrar todos los movimientos.
+### Funcionalidades de la GUI
 
-## CLI (opcional)
+- **Resumen visual** con métricas clave:
+  - Balance mensual
+  - Ingresos y gastos del periodo
+  - Tasa de ahorro
+  - Saldo total en cuentas
+  - Capital invertido
+- **Filtro por mes y año** para revisar movimientos por periodos.
+- **Gráfico de evolución** de ingresos/gastos de los últimos 6 meses.
+- **Gestión de movimientos**:
+  - Alta con tipo, cuenta, categoría, fecha y descripción.
+  - Tabla filtrada por periodo.
+  - Eliminación individual.
+  - Exportación CSV mensual.
+- **Gestión de cuentas bancarias**:
+  - Alta de cuentas (nombre, banco, tipo, moneda, saldo).
+  - Tabla con saldo total agregado.
+- **Gestión de inversiones**:
+  - Alta de activos (tipo, broker, capital invertido, valor actual, riesgo).
+  - Resumen de rentabilidad total.
+  - Gráfico de composición de cartera por tipo.
+
+## 2) CLI (opcional)
 
 ```bash
 python3 finanzas.py agregar --tipo ingreso --monto 1500 --categoria salario --descripcion "Nómina"
@@ -28,7 +45,8 @@ python3 finanzas.py listar
 python3 finanzas.py resumen
 ```
 
-Comandos disponibles:
+Comandos:
+
 - `agregar --tipo {ingreso,gasto} --monto N --categoria TXT --descripcion TXT [--fecha YYYY-MM-DD]`
 - `listar [--limite N]`
 - `eliminar ID`
@@ -38,4 +56,4 @@ Comandos disponibles:
 ## Requisitos
 
 - Python 3.10+
-- Tkinter (suele venir con Python en la mayoría de sistemas)
+- Tkinter (normalmente incluido con Python en Windows/macOS; en Linux puede requerir paquete adicional)
