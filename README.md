@@ -38,6 +38,7 @@ python3 finanzas_gui.py
   - Saldo agregado y actualización de datos
 - **Inversiones:**
   - Alta de aportes
+  - El valor actual inicial se asume igual al aporte invertido
   - Acumulación automática por activo (ej. NVIDIA)
   - Edición de posición y actualización de valor actual (cotización)
   - Doble clic sobre una posición para actualizar rápido su valor actual

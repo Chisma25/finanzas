@@ -524,16 +524,16 @@ class FinanzasApp(tk.Tk):
         except tk.TclError:
             pass
 
-        bg = "#EEF3FB"
+        bg = "#EAF2FF"
         card_bg = "#FFFFFF"
         text = "#1C2A3A"
-        muted = "#617389"
-        primary = "#2D6CDF"
-        primary_hover = "#2458B8"
-        danger = "#C44545"
+        muted = "#4F6480"
+        primary = "#2E77F3"
+        primary_hover = "#1F63D3"
+        danger = "#D34B4B"
 
         style.configure("Root.TFrame", background=bg)
-        style.configure("Card.TLabelframe", background=card_bg, bordercolor="#DCE4F2", relief="solid")
+        style.configure("Card.TLabelframe", background=card_bg, bordercolor="#CEDBF2", relief="solid")
         style.configure("Card.TLabelframe.Label", background=card_bg, foreground=text, font=("Segoe UI", 10, "bold"))
         style.configure("Header.TLabel", background=bg, foreground=text, font=("Segoe UI", 20, "bold"))
         style.configure("SubHeader.TLabel", background=bg, foreground=muted, font=("Segoe UI", 10))
@@ -541,22 +541,22 @@ class FinanzasApp(tk.Tk):
 
         style.configure("Accent.TButton", font=("Segoe UI", 10, "bold"), padding=(12, 8), foreground="#FFFFFF", background=primary, borderwidth=0)
         style.map("Accent.TButton", background=[("active", primary_hover), ("pressed", primary_hover)])
-        style.configure("Secondary.TButton", font=("Segoe UI", 10), padding=(12, 8), background="#E8EEF9", foreground="#28476B")
-        style.map("Secondary.TButton", background=[("active", "#DCE7FA")])
+        style.configure("Secondary.TButton", font=("Segoe UI", 10), padding=(12, 8), background="#E1ECFF", foreground="#28476B")
+        style.map("Secondary.TButton", background=[("active", "#D4E4FF")])
         style.configure("Danger.TButton", font=("Segoe UI", 10, "bold"), padding=(12, 8), background=danger, foreground="#FFFFFF")
         style.map("Danger.TButton", background=[("active", "#A73939")])
 
         style.configure("Modern.TNotebook", background=bg, borderwidth=0)
-        style.configure("Modern.TNotebook.Tab", font=("Segoe UI", 10, "bold"), padding=(16, 10), background="#E4EBF8", foreground="#3D5371")
+        style.configure("Modern.TNotebook.Tab", font=("Segoe UI", 10, "bold"), padding=(16, 10), background="#DBE8FF", foreground="#2F4E73")
         style.map(
             "Modern.TNotebook.Tab",
-            background=[("selected", "#FFFFFF"), ("active", "#DCE7FA")],
+            background=[("selected", "#FFFFFF"), ("active", "#D2E2FF")],
             foreground=[("selected", text)],
         )
 
         style.configure("Modern.Treeview", rowheight=30, font=("Segoe UI", 10), fieldbackground="#FFFFFF", background="#FFFFFF")
-        style.configure("Modern.Treeview.Heading", font=("Segoe UI", 10, "bold"), background="#EFF3FB", foreground="#2A3D57")
-        style.map("Modern.Treeview", background=[("selected", "#DDE9FF")], foreground=[("selected", text)])
+        style.configure("Modern.Treeview.Heading", font=("Segoe UI", 10, "bold"), background="#E7EFFF", foreground="#2A3D57")
+        style.map("Modern.Treeview", background=[("selected", "#CFE0FF")], foreground=[("selected", text)])
 
         style.configure("TEntry", padding=6)
         style.configure("TCombobox", padding=4)
@@ -777,7 +777,6 @@ class FinanzasApp(tk.Tk):
         self.inv_tipo = tk.StringVar(value="Acción")
         self.inv_broker = tk.StringVar()
         self.inv_invertido = tk.StringVar()
-        self.inv_actual = tk.StringVar()
         self.inv_riesgo = tk.StringVar(value="Medio")
         self.inv_fecha = tk.StringVar(value=date.today().isoformat())
         self.inv_cuenta = tk.StringVar(value="Sin cuenta")
@@ -795,10 +794,8 @@ class FinanzasApp(tk.Tk):
         ).grid(row=1, column=1, sticky="w", padx=(0, 10), pady=(2, 0))
         ttk.Label(form, text="Broker").grid(row=0, column=2, sticky="w", padx=(0, 10))
         ttk.Entry(form, textvariable=self.inv_broker, width=16).grid(row=1, column=2, sticky="we", padx=(0, 10), pady=(2, 0))
-        ttk.Label(form, text="Aporte (€)").grid(row=0, column=3, sticky="w", padx=(0, 10))
+        ttk.Label(form, text="Aporte inicial (€)").grid(row=0, column=3, sticky="w", padx=(0, 10))
         ttk.Entry(form, textvariable=self.inv_invertido, width=12).grid(row=1, column=3, sticky="w", padx=(0, 10), pady=(2, 0))
-        ttk.Label(form, text="Valor actual (€)").grid(row=0, column=4, sticky="w", padx=(0, 10))
-        ttk.Entry(form, textvariable=self.inv_actual, width=14).grid(row=1, column=4, sticky="w", padx=(0, 10), pady=(2, 0))
         ttk.Label(form, text="Cuenta origen").grid(row=0, column=5, sticky="w", padx=(0, 10))
         self.inv_account_combo = ttk.Combobox(form, textvariable=self.inv_cuenta, state="readonly", width=18)
         self.inv_account_combo.grid(row=1, column=5, sticky="we", padx=(0, 10), pady=(2, 0))
@@ -807,6 +804,11 @@ class FinanzasApp(tk.Tk):
             row=1, column=6, sticky="w", padx=(0, 10), pady=(2, 0)
         )
         ttk.Checkbutton(form, text="Recurrente mensual", variable=self.inv_recurrente).grid(row=1, column=7, padx=(8, 10), sticky="w", pady=(2, 0))
+        ttk.Label(
+            form,
+            text="(El valor actual se actualiza después desde 'Actualizar valor actual')",
+            style="SubHeader.TLabel",
+        ).grid(row=2, column=0, columnspan=7, sticky="w", pady=(8, 0))
         ttk.Button(form, text="Guardar inversión", command=self.add_investment, style="Accent.TButton").grid(row=1, column=8, padx=(8, 0), pady=(2, 0))
 
         self.inv_summary_var = tk.StringVar(value="Invertido: 0,00 € | Valor actual: 0,00 € | Rentabilidad: 0,00 €")
@@ -1323,14 +1325,15 @@ class FinanzasApp(tk.Tk):
 
         try:
             invertido = float(self.inv_invertido.get().strip())
-            actual = float(self.inv_actual.get().strip()) if self.inv_actual.get().strip() else invertido
         except ValueError:
-            messagebox.showerror("Valores", "Invertido/actual deben ser numéricos")
+            messagebox.showerror("Valores", "El aporte invertido debe ser numérico")
             return
 
-        if not nombre or invertido <= 0 or actual < 0:
-            messagebox.showerror("Valores", "Revisa activo, invertido y valor actual")
+        if not nombre or invertido <= 0:
+            messagebox.showerror("Valores", "Revisa activo y aporte inicial")
             return
+
+        actual = invertido
 
         fecha_text = date.today().isoformat()
         if invertido > get_available_cash(self.conn):
@@ -1381,7 +1384,6 @@ class FinanzasApp(tk.Tk):
         self.inv_nombre.set("")
         self.inv_broker.set("")
         self.inv_invertido.set("")
-        self.inv_actual.set("")
         self.inv_riesgo.set("Medio")
         self.inv_recurrente.set(False)
         self.refresh_all()
