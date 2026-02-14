@@ -660,6 +660,7 @@ class FinanzasApp(tk.Tk):
     def _build_movimientos_tab(self) -> None:
         top = ttk.LabelFrame(self.mov_tab, text=" Nuevo movimiento ", style="Card.TLabelframe", padding=10)
         top.pack(fill="x")
+        top.columnconfigure(3, weight=1)
 
         self.mov_tipo = tk.StringVar(value="gasto")
         self.mov_monto = tk.StringVar()
@@ -669,25 +670,27 @@ class FinanzasApp(tk.Tk):
         self.mov_cuenta = tk.StringVar(value="Sin cuenta")
         self.mov_recurrente = tk.BooleanVar(value=False)
 
-        ttk.Label(top, text="Tipo").grid(row=0, column=0, sticky="w")
-        ttk.Combobox(top, textvariable=self.mov_tipo, values=["ingreso", "gasto"], state="readonly", width=12).grid(row=1, column=0)
+        ttk.Label(top, text="Tipo").grid(row=0, column=0, sticky="w", padx=(0, 10))
+        ttk.Combobox(top, textvariable=self.mov_tipo, values=["ingreso", "gasto"], state="readonly", width=12).grid(
+            row=1, column=0, sticky="w", padx=(0, 10), pady=(2, 0)
+        )
 
-        ttk.Label(top, text="Monto").grid(row=0, column=1, sticky="w")
-        ttk.Entry(top, textvariable=self.mov_monto, width=12).grid(row=1, column=1)
+        ttk.Label(top, text="Monto").grid(row=0, column=1, sticky="w", padx=(0, 10))
+        ttk.Entry(top, textvariable=self.mov_monto, width=12).grid(row=1, column=1, sticky="w", padx=(0, 10), pady=(2, 0))
 
-        ttk.Label(top, text="Categoría").grid(row=0, column=2, sticky="w")
-        ttk.Entry(top, textvariable=self.mov_categoria, width=16).grid(row=1, column=2)
+        ttk.Label(top, text="Categoría").grid(row=0, column=2, sticky="w", padx=(0, 10))
+        ttk.Entry(top, textvariable=self.mov_categoria, width=16).grid(row=1, column=2, sticky="w", padx=(0, 10), pady=(2, 0))
 
-        ttk.Label(top, text="Cuenta").grid(row=0, column=3, sticky="w")
+        ttk.Label(top, text="Cuenta").grid(row=0, column=3, sticky="w", padx=(0, 10))
         self.mov_account_combo = ttk.Combobox(top, textvariable=self.mov_cuenta, state="readonly", width=22)
-        self.mov_account_combo.grid(row=1, column=3)
+        self.mov_account_combo.grid(row=1, column=3, sticky="we", padx=(0, 10), pady=(2, 0))
 
-        ttk.Label(top, text="Fecha").grid(row=0, column=4, sticky="w")
-        ttk.Entry(top, textvariable=self.mov_fecha, width=12).grid(row=1, column=4)
+        ttk.Label(top, text="Fecha").grid(row=0, column=4, sticky="w", padx=(0, 10))
+        ttk.Entry(top, textvariable=self.mov_fecha, width=12).grid(row=1, column=4, sticky="w", padx=(0, 10), pady=(2, 0))
 
         ttk.Label(top, text="Descripción").grid(row=2, column=0, sticky="w", pady=(8, 0))
-        ttk.Entry(top, textvariable=self.mov_descripcion, width=60).grid(row=3, column=0, columnspan=4, sticky="we")
-        ttk.Checkbutton(top, text="Recurrente mensual (solo gastos)", variable=self.mov_recurrente).grid(row=3, column=4, sticky="w")
+        ttk.Entry(top, textvariable=self.mov_descripcion, width=60).grid(row=3, column=0, columnspan=4, sticky="we", padx=(0, 10), pady=(2, 0))
+        ttk.Checkbutton(top, text="Recurrente mensual (solo gastos)", variable=self.mov_recurrente).grid(row=3, column=4, sticky="w", padx=(0, 10), pady=(2, 0))
         ttk.Button(top, text="Guardar movimiento", command=self.add_movimiento, style="Accent.TButton").grid(row=3, column=5, padx=(8, 0))
 
         table_frame = ttk.LabelFrame(self.mov_tab, text=" Movimientos del periodo ", style="Card.TLabelframe", padding=8)
@@ -767,6 +770,8 @@ class FinanzasApp(tk.Tk):
     def _build_investments_tab(self) -> None:
         form = ttk.LabelFrame(self.investments_tab, text=" Nueva inversión / aporte ", style="Card.TLabelframe", padding=10)
         form.pack(fill="x")
+        for col in range(0, 9):
+            form.columnconfigure(col, weight=1 if col in {0, 2, 5} else 0)
 
         self.inv_nombre = tk.StringVar()
         self.inv_tipo = tk.StringVar(value="Acción")
@@ -778,23 +783,31 @@ class FinanzasApp(tk.Tk):
         self.inv_cuenta = tk.StringVar(value="Sin cuenta")
         self.inv_recurrente = tk.BooleanVar(value=False)
 
-        ttk.Label(form, text="Activo").grid(row=0, column=0, sticky="w")
-        ttk.Entry(form, textvariable=self.inv_nombre, width=18).grid(row=1, column=0)
-        ttk.Label(form, text="Tipo").grid(row=0, column=1, sticky="w")
-        ttk.Combobox(form, textvariable=self.inv_tipo, values=["Acción", "ETF", "Fondo", "Cripto", "Renta fija", "Otro"], state="readonly", width=12).grid(row=1, column=1)
-        ttk.Label(form, text="Broker").grid(row=0, column=2, sticky="w")
-        ttk.Entry(form, textvariable=self.inv_broker, width=16).grid(row=1, column=2)
-        ttk.Label(form, text="Aporte invertido").grid(row=0, column=3, sticky="w")
-        ttk.Entry(form, textvariable=self.inv_invertido, width=12).grid(row=1, column=3)
-        ttk.Label(form, text="Valor actual del aporte").grid(row=0, column=4, sticky="w")
-        ttk.Entry(form, textvariable=self.inv_actual, width=14).grid(row=1, column=4)
-        ttk.Label(form, text="Cuenta origen").grid(row=0, column=5, sticky="w")
+        ttk.Label(form, text="Activo").grid(row=0, column=0, sticky="w", padx=(0, 10))
+        ttk.Entry(form, textvariable=self.inv_nombre, width=18).grid(row=1, column=0, sticky="we", padx=(0, 10), pady=(2, 0))
+        ttk.Label(form, text="Tipo").grid(row=0, column=1, sticky="w", padx=(0, 10))
+        ttk.Combobox(
+            form,
+            textvariable=self.inv_tipo,
+            values=["Acción", "ETF", "Fondo", "Cripto", "Renta fija", "Otro"],
+            state="readonly",
+            width=12,
+        ).grid(row=1, column=1, sticky="w", padx=(0, 10), pady=(2, 0))
+        ttk.Label(form, text="Broker").grid(row=0, column=2, sticky="w", padx=(0, 10))
+        ttk.Entry(form, textvariable=self.inv_broker, width=16).grid(row=1, column=2, sticky="we", padx=(0, 10), pady=(2, 0))
+        ttk.Label(form, text="Aporte (€)").grid(row=0, column=3, sticky="w", padx=(0, 10))
+        ttk.Entry(form, textvariable=self.inv_invertido, width=12).grid(row=1, column=3, sticky="w", padx=(0, 10), pady=(2, 0))
+        ttk.Label(form, text="Valor actual (€)").grid(row=0, column=4, sticky="w", padx=(0, 10))
+        ttk.Entry(form, textvariable=self.inv_actual, width=14).grid(row=1, column=4, sticky="w", padx=(0, 10), pady=(2, 0))
+        ttk.Label(form, text="Cuenta origen").grid(row=0, column=5, sticky="w", padx=(0, 10))
         self.inv_account_combo = ttk.Combobox(form, textvariable=self.inv_cuenta, state="readonly", width=18)
-        self.inv_account_combo.grid(row=1, column=5)
-        ttk.Label(form, text="Riesgo").grid(row=0, column=6, sticky="w")
-        ttk.Combobox(form, textvariable=self.inv_riesgo, values=["Bajo", "Medio", "Alto"], state="readonly", width=10).grid(row=1, column=6)
-        ttk.Checkbutton(form, text="Recurrente mensual", variable=self.inv_recurrente).grid(row=1, column=7, padx=(8, 0), sticky="w")
-        ttk.Button(form, text="Guardar inversión", command=self.add_investment, style="Accent.TButton").grid(row=1, column=8, padx=(8, 0))
+        self.inv_account_combo.grid(row=1, column=5, sticky="we", padx=(0, 10), pady=(2, 0))
+        ttk.Label(form, text="Riesgo").grid(row=0, column=6, sticky="w", padx=(0, 10))
+        ttk.Combobox(form, textvariable=self.inv_riesgo, values=["Bajo", "Medio", "Alto"], state="readonly", width=10).grid(
+            row=1, column=6, sticky="w", padx=(0, 10), pady=(2, 0)
+        )
+        ttk.Checkbutton(form, text="Recurrente mensual", variable=self.inv_recurrente).grid(row=1, column=7, padx=(8, 10), sticky="w", pady=(2, 0))
+        ttk.Button(form, text="Guardar inversión", command=self.add_investment, style="Accent.TButton").grid(row=1, column=8, padx=(8, 0), pady=(2, 0))
 
         self.inv_summary_var = tk.StringVar(value="Invertido: 0,00 € | Valor actual: 0,00 € | Rentabilidad: 0,00 €")
         ttk.Label(self.investments_tab, textvariable=self.inv_summary_var, style="Header.TLabel").pack(anchor="w", pady=(8, 6))
