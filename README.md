@@ -27,12 +27,13 @@ python3 finanzas_gui.py
   - Valor total de cartera
   - Gráfico de evolución de los últimos 6 meses
 - **Filtro por mes y año** para consultar movimientos por periodos.
+  - Selector de años disponible desde el año actual hasta 2040.
 - **Control de liquidez (sin crédito):**
   - Gastos e inversiones quedan limitados por dinero disponible.
 - **Movimientos:**
   - Alta de ingresos/gastos con cuenta asociada
   - Exportación CSV del mes
-  - Gasto recurrente mensual opcional
+  - Ingreso o gasto recurrente mensual opcional (ej. salario)
 - **Cuentas bancarias:**
   - Alta, edición y eliminación
   - Saldo agregado y actualización de datos
@@ -73,3 +74,20 @@ Comandos:
 
 - Python 3.10+
 - Tkinter (normalmente incluido con Python en Windows/macOS; en Linux puede requerir paquete adicional)
+
+## Empaquetado profesional (app ejecutable)
+
+Si quieres compartir la app como una aplicación "normal" sin ejecutar `.py`:
+
+1. Instala PyInstaller:
+
+```bash
+pip install pyinstaller
+```
+
+2. Genera ejecutable:
+
+- **Windows:** ejecutar `packaging/build_windows.bat`
+- **Linux/macOS:** ejecutar `packaging/build_unix.sh`
+
+3. El binario final queda en `dist/MisFinanzas/`.

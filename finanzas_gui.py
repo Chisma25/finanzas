@@ -112,7 +112,7 @@ def init_db(conn: sqlite3.Connection) -> None:
         """
         CREATE TABLE IF NOT EXISTS recurrencias (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tipo TEXT NOT NULL CHECK(tipo IN ('gasto', 'inversion')),
+            tipo TEXT NOT NULL CHECK(tipo IN ('ingreso', 'gasto', 'inversion')),
             nombre TEXT NOT NULL,
             categoria_tipo TEXT NOT NULL,
             descripcion TEXT,
@@ -130,7 +130,58 @@ def init_db(conn: sqlite3.Connection) -> None:
         )
         """
     )
+    migrate_recurrencias_schema(conn)
     conn.commit()
+
+
+def migrate_recurrencias_schema(conn: sqlite3.Connection) -> None:
+    """Actualiza recurrencias legacy para permitir también ingresos recurrentes."""
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='recurrencias'"
+    ).fetchone()
+    if row is None:
+        return
+
+    sql = (row["sql"] or "").lower()
+    if "('ingreso', 'gasto', 'inversion')" in sql:
+        return
+
+    conn.execute("ALTER TABLE recurrencias RENAME TO recurrencias_old")
+    conn.execute(
+        """
+        CREATE TABLE recurrencias (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tipo TEXT NOT NULL CHECK(tipo IN ('ingreso', 'gasto', 'inversion')),
+            nombre TEXT NOT NULL,
+            categoria_tipo TEXT NOT NULL,
+            descripcion TEXT,
+            monto REAL NOT NULL,
+            valor_actual REAL,
+            riesgo TEXT,
+            broker TEXT,
+            cuenta_id INTEGER,
+            activa INTEGER NOT NULL DEFAULT 1,
+            inicio_year INTEGER NOT NULL,
+            inicio_month INTEGER NOT NULL,
+            ultimo_year INTEGER,
+            ultimo_month INTEGER,
+            creado_en TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO recurrencias (
+            id, tipo, nombre, categoria_tipo, descripcion, monto, valor_actual, riesgo, broker,
+            cuenta_id, activa, inicio_year, inicio_month, ultimo_year, ultimo_month, creado_en
+        )
+        SELECT
+            id, tipo, nombre, categoria_tipo, descripcion, monto, valor_actual, riesgo, broker,
+            cuenta_id, activa, inicio_year, inicio_month, ultimo_year, ultimo_month, creado_en
+        FROM recurrencias_old
+        """
+    )
+    conn.execute("DROP TABLE recurrencias_old")
 
 
 def migrate_investments_legacy_data(conn: sqlite3.Connection) -> None:
@@ -342,6 +393,24 @@ def apply_recurring_entries(conn: sqlite3.Connection, today: date | None = None)
                 )
                 if rule["cuenta_id"]:
                     conn.execute("UPDATE cuentas SET saldo = saldo - ? WHERE id = ?", (rule["monto"], rule["cuenta_id"]))
+
+            if rule["tipo"] == "ingreso":
+                conn.execute(
+                    """
+                    INSERT INTO transacciones (fecha, tipo, categoria, descripcion, monto, cuenta_id, origen_regla_id)
+                    VALUES (?, 'ingreso', ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        fecha,
+                        rule["categoria_tipo"],
+                        f"{rule['descripcion'] or rule['nombre']} (recurrente)",
+                        rule["monto"],
+                        rule["cuenta_id"],
+                        rule["id"],
+                    ),
+                )
+                if rule["cuenta_id"]:
+                    conn.execute("UPDATE cuentas SET saldo = saldo + ? WHERE id = ?", (rule["monto"], rule["cuenta_id"]))
 
             if rule["tipo"] == "inversion":
                 disponible = get_available_cash(conn)
@@ -690,7 +759,7 @@ class FinanzasApp(tk.Tk):
 
         ttk.Label(top, text="Descripción").grid(row=2, column=0, sticky="w", pady=(8, 0))
         ttk.Entry(top, textvariable=self.mov_descripcion, width=60).grid(row=3, column=0, columnspan=4, sticky="we", padx=(0, 10), pady=(2, 0))
-        ttk.Checkbutton(top, text="Recurrente mensual (solo gastos)", variable=self.mov_recurrente).grid(row=3, column=4, sticky="w", padx=(0, 10), pady=(2, 0))
+        ttk.Checkbutton(top, text="Recurrente mensual", variable=self.mov_recurrente).grid(row=3, column=4, sticky="w", padx=(0, 10), pady=(2, 0))
         ttk.Button(top, text="Guardar movimiento", command=self.add_movimiento, style="Accent.TButton").grid(row=3, column=5, padx=(8, 0))
 
         table_frame = ttk.LabelFrame(self.mov_tab, text=" Movimientos del periodo ", style="Card.TLabelframe", padding=8)
@@ -892,7 +961,7 @@ class FinanzasApp(tk.Tk):
         return year, month
 
     def refresh_period_options(self) -> None:
-        years = {date.today().year}
+        years = set(range(date.today().year, 2041))
         rows = self.conn.execute("SELECT fecha FROM transacciones").fetchall()
         for row in rows:
             try:
@@ -1175,15 +1244,16 @@ class FinanzasApp(tk.Tk):
             delta = monto if tipo == "ingreso" else -monto
             self.conn.execute("UPDATE cuentas SET saldo = saldo + ? WHERE id = ?", (delta, cuenta_id))
 
-        if self.mov_recurrente.get() and tipo == "gasto":
+        if self.mov_recurrente.get() and tipo in {"gasto", "ingreso"}:
             d = parse_iso_date(fecha_text)
             self.conn.execute(
                 """
                 INSERT INTO recurrencias
                 (tipo, nombre, categoria_tipo, descripcion, monto, cuenta_id, inicio_year, inicio_month, ultimo_year, ultimo_month, creado_en)
-                VALUES ('gasto', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
+                    tipo,
                     categoria,
                     categoria,
                     descripcion,
