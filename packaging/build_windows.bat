@@ -2,9 +2,10 @@
 setlocal
 
 REM Requiere: pip install pyinstaller
-pyinstaller --noconfirm --clean --windowed --name MisFinanzas finanzas_gui.py
+REM Genera UN solo .exe (one-file) sin consola
+pyinstaller --noconfirm --clean --onefile --windowed --name MisFinanzas finanzas_gui.py
 
 echo.
-echo Ejecutable generado en: dist\MisFinanzas\MisFinanzas.exe
-echo Puedes compartir la carpeta dist\MisFinanzas completa.
+echo Ejecutable generado en: dist\MisFinanzas.exe
+echo Puedes compartir directamente este .exe.
 endlocal

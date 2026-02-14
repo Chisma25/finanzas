@@ -88,6 +88,8 @@ pip install pyinstaller
 2. Genera ejecutable:
 
 - **Windows:** ejecutar `packaging/build_windows.bat`
+  - Resultado: `dist/MisFinanzas.exe` (un único `.exe`)
 - **Linux/macOS:** ejecutar `packaging/build_unix.sh`
+  - Resultado: `dist/MisFinanzas` (binario único)
 
-3. El binario final queda en `dist/MisFinanzas/`.
+3. Puedes compartir directamente ese binario generado.
