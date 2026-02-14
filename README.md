@@ -93,3 +93,14 @@ pip install pyinstaller
   - Resultado: `dist/MisFinanzas` (binario único)
 
 3. Puedes compartir directamente ese binario generado.
+
+
+### Si el `.bat` se cierra solo
+
+- Ejecuta `build_windows.bat` haciendo doble clic o desde `cmd`.
+- El script ahora hace `pause` al final y también cuando hay error para que puedas leer el mensaje.
+- Si falla al inicio, instala PyInstaller con:
+
+```bash
+pip install pyinstaller
+```
