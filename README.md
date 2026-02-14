@@ -15,6 +15,11 @@ python3 finanzas_gui.py
 
 ### Funcionalidades clave
 
+- **Diseño renovado (más moderno):**
+  - Tipografía y espaciados más limpios
+  - Botones primarios/secundarios/peligro bien diferenciados
+  - Pestañas y tablas con estilo visual más actual
+
 - **Resumen visual** con:
   - Balance, ingresos y gastos del periodo
   - Tasa de ahorro

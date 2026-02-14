@@ -524,13 +524,42 @@ class FinanzasApp(tk.Tk):
         except tk.TclError:
             pass
 
-        style.configure("Root.TFrame", background="#F2F5FA")
-        style.configure("Card.TLabelframe", background="#FFFFFF")
-        style.configure("Card.TLabelframe.Label", background="#FFFFFF", foreground="#1D2A3A", font=("Segoe UI", 10, "bold"))
-        style.configure("Header.TLabel", background="#F2F5FA", foreground="#1D2A3A", font=("Segoe UI", 18, "bold"))
-        style.configure("SubHeader.TLabel", background="#F2F5FA", foreground="#607089", font=("Segoe UI", 10))
-        style.configure("MetricValue.TLabel", background="#FFFFFF", foreground="#1D2A3A", font=("Segoe UI", 16, "bold"))
-        style.configure("Accent.TButton", font=("Segoe UI", 10, "bold"))
+        bg = "#EEF3FB"
+        card_bg = "#FFFFFF"
+        text = "#1C2A3A"
+        muted = "#617389"
+        primary = "#2D6CDF"
+        primary_hover = "#2458B8"
+        danger = "#C44545"
+
+        style.configure("Root.TFrame", background=bg)
+        style.configure("Card.TLabelframe", background=card_bg, bordercolor="#DCE4F2", relief="solid")
+        style.configure("Card.TLabelframe.Label", background=card_bg, foreground=text, font=("Segoe UI", 10, "bold"))
+        style.configure("Header.TLabel", background=bg, foreground=text, font=("Segoe UI", 20, "bold"))
+        style.configure("SubHeader.TLabel", background=bg, foreground=muted, font=("Segoe UI", 10))
+        style.configure("MetricValue.TLabel", background=card_bg, foreground=text, font=("Segoe UI", 18, "bold"))
+
+        style.configure("Accent.TButton", font=("Segoe UI", 10, "bold"), padding=(12, 8), foreground="#FFFFFF", background=primary, borderwidth=0)
+        style.map("Accent.TButton", background=[("active", primary_hover), ("pressed", primary_hover)])
+        style.configure("Secondary.TButton", font=("Segoe UI", 10), padding=(12, 8), background="#E8EEF9", foreground="#28476B")
+        style.map("Secondary.TButton", background=[("active", "#DCE7FA")])
+        style.configure("Danger.TButton", font=("Segoe UI", 10, "bold"), padding=(12, 8), background=danger, foreground="#FFFFFF")
+        style.map("Danger.TButton", background=[("active", "#A73939")])
+
+        style.configure("Modern.TNotebook", background=bg, borderwidth=0)
+        style.configure("Modern.TNotebook.Tab", font=("Segoe UI", 10, "bold"), padding=(16, 10), background="#E4EBF8", foreground="#3D5371")
+        style.map(
+            "Modern.TNotebook.Tab",
+            background=[("selected", "#FFFFFF"), ("active", "#DCE7FA")],
+            foreground=[("selected", text)],
+        )
+
+        style.configure("Modern.Treeview", rowheight=30, font=("Segoe UI", 10), fieldbackground="#FFFFFF", background="#FFFFFF")
+        style.configure("Modern.Treeview.Heading", font=("Segoe UI", 10, "bold"), background="#EFF3FB", foreground="#2A3D57")
+        style.map("Modern.Treeview", background=[("selected", "#DDE9FF")], foreground=[("selected", text)])
+
+        style.configure("TEntry", padding=6)
+        style.configure("TCombobox", padding=4)
 
     def _build_ui(self) -> None:
         root = ttk.Frame(self, padding=12, style="Root.TFrame")
@@ -560,14 +589,15 @@ class FinanzasApp(tk.Tk):
         self.month_combo.pack(side="left", padx=(6, 12))
 
         ttk.Button(filters, text="Aplicar periodo", command=self.refresh_all, style="Accent.TButton").pack(side="left")
-        ttk.Button(filters, text="Aplicar recurrencias ahora", command=self.apply_recurrences_now).pack(side="left", padx=(8, 0))
+        ttk.Button(filters, text="Aplicar recurrencias ahora", command=self.apply_recurrences_now, style="Secondary.TButton").pack(side="left", padx=(8, 0))
         ttk.Button(
             filters,
             text="Resetear base de datos",
             command=self.reset_database_with_confirmation,
+            style="Danger.TButton",
         ).pack(side="right")
 
-        self.notebook = ttk.Notebook(root)
+        self.notebook = ttk.Notebook(root, style="Modern.TNotebook")
         self.notebook.pack(fill="both", expand=True)
 
         self.dashboard_tab = ttk.Frame(self.notebook, padding=10)
@@ -664,7 +694,7 @@ class FinanzasApp(tk.Tk):
         table_frame.pack(fill="both", expand=True, pady=(10, 0))
 
         cols = ("id", "fecha", "tipo", "categoria", "cuenta", "monto", "descripcion")
-        self.mov_tree = ttk.Treeview(table_frame, columns=cols, show="headings")
+        self.mov_tree = ttk.Treeview(table_frame, columns=cols, show="headings", style="Modern.Treeview")
         widths = {"id": 50, "fecha": 100, "tipo": 80, "categoria": 120, "cuenta": 170, "monto": 110, "descripcion": 360}
         headers = {
             "id": "ID",
@@ -687,8 +717,8 @@ class FinanzasApp(tk.Tk):
 
         actions = ttk.Frame(self.mov_tab)
         actions.pack(fill="x", pady=(8, 0))
-        ttk.Button(actions, text="Eliminar seleccionada", command=self.delete_movimiento).pack(side="left")
-        ttk.Button(actions, text="Exportar CSV", command=self.export_movimientos_csv).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Eliminar seleccionada", command=self.delete_movimiento, style="Secondary.TButton").pack(side="left")
+        ttk.Button(actions, text="Exportar CSV", command=self.export_movimientos_csv, style="Secondary.TButton").pack(side="left", padx=(8, 0))
 
     def _build_accounts_tab(self) -> None:
         form = ttk.LabelFrame(self.accounts_tab, text=" Nueva cuenta bancaria ", style="Card.TLabelframe", padding=10)
@@ -719,7 +749,7 @@ class FinanzasApp(tk.Tk):
         table.pack(fill="both", expand=True)
 
         cols = ("id", "nombre", "banco", "tipo", "moneda", "saldo")
-        self.accounts_tree = ttk.Treeview(table, columns=cols, show="headings")
+        self.accounts_tree = ttk.Treeview(table, columns=cols, show="headings", style="Modern.Treeview")
         for c, t, w in [("id", "ID", 50), ("nombre", "Nombre", 190), ("banco", "Banco", 170), ("tipo", "Tipo", 120), ("moneda", "Moneda", 90), ("saldo", "Saldo", 130)]:
             self.accounts_tree.heading(c, text=t)
             self.accounts_tree.column(c, width=w, anchor="e" if c == "saldo" else "w")
@@ -731,8 +761,8 @@ class FinanzasApp(tk.Tk):
 
         actions = ttk.Frame(self.accounts_tab)
         actions.pack(fill="x", pady=(8, 0))
-        ttk.Button(actions, text="Editar cuenta", command=self.edit_account).pack(side="left")
-        ttk.Button(actions, text="Eliminar cuenta", command=self.delete_account).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Editar cuenta", command=self.edit_account, style="Secondary.TButton").pack(side="left")
+        ttk.Button(actions, text="Eliminar cuenta", command=self.delete_account, style="Secondary.TButton").pack(side="left", padx=(8, 0))
 
     def _build_investments_tab(self) -> None:
         form = ttk.LabelFrame(self.investments_tab, text=" Nueva inversión / aporte ", style="Card.TLabelframe", padding=10)
@@ -778,7 +808,7 @@ class FinanzasApp(tk.Tk):
         table.pack(fill="both", expand=True, pady=(10, 0))
 
         cols = ("id", "nombre", "tipo", "broker", "invertido", "actual", "riesgo", "rent")
-        self.inv_tree = ttk.Treeview(table, columns=cols, show="headings")
+        self.inv_tree = ttk.Treeview(table, columns=cols, show="headings", style="Modern.Treeview")
         for c, t, w in [
             ("id", "ID", 50),
             ("nombre", "Activo", 170),
@@ -800,9 +830,9 @@ class FinanzasApp(tk.Tk):
 
         actions = ttk.Frame(self.investments_tab)
         actions.pack(fill="x", pady=(8, 0))
-        ttk.Button(actions, text="Editar posición", command=self.edit_investment).pack(side="left")
-        ttk.Button(actions, text="Actualizar valor actual", command=self.quick_update_investment_value).pack(side="left", padx=(8, 0))
-        ttk.Button(actions, text="Eliminar posición", command=self.delete_investment).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Editar posición", command=self.edit_investment, style="Secondary.TButton").pack(side="left")
+        ttk.Button(actions, text="Actualizar valor actual", command=self.quick_update_investment_value, style="Secondary.TButton").pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Eliminar posición", command=self.delete_investment, style="Secondary.TButton").pack(side="left", padx=(8, 0))
 
     def _build_recurrences_tab(self) -> None:
         info = ttk.Label(self.recurrences_tab, text="Puedes activar/desactivar reglas recurrentes mensuales de gastos e inversiones.")
@@ -812,7 +842,7 @@ class FinanzasApp(tk.Tk):
         table.pack(fill="both", expand=True)
 
         cols = ("id", "tipo", "nombre", "categoria", "monto", "cuenta", "estado", "ultimo")
-        self.rec_tree = ttk.Treeview(table, columns=cols, show="headings")
+        self.rec_tree = ttk.Treeview(table, columns=cols, show="headings", style="Modern.Treeview")
         for c, t, w in [
             ("id", "ID", 50),
             ("tipo", "Tipo", 90),
@@ -833,8 +863,8 @@ class FinanzasApp(tk.Tk):
 
         actions = ttk.Frame(self.recurrences_tab)
         actions.pack(fill="x", pady=(8, 0))
-        ttk.Button(actions, text="Activar/Desactivar", command=self.toggle_recurrence).pack(side="left")
-        ttk.Button(actions, text="Eliminar regla", command=self.delete_recurrence).pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Activar/Desactivar", command=self.toggle_recurrence, style="Secondary.TButton").pack(side="left")
+        ttk.Button(actions, text="Eliminar regla", command=self.delete_recurrence, style="Secondary.TButton").pack(side="left", padx=(8, 0))
 
     def selected_year_month(self) -> tuple[int, int]:
         try:
