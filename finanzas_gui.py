@@ -26,6 +26,67 @@ MONTH_NAMES = {
     12: "Diciembre",
 }
 
+THEMES = {
+    "light": {
+        "window_bg": "#F2F5FA",
+        "bg": "#EAF2FF",
+        "card_bg": "#FFFFFF",
+        "card_border": "#CEDBF2",
+        "text": "#1C2A3A",
+        "muted": "#4F6480",
+        "primary": "#2E77F3",
+        "primary_hover": "#1F63D3",
+        "secondary_bg": "#E1ECFF",
+        "secondary_hover": "#D4E4FF",
+        "secondary_text": "#28476B",
+        "danger": "#D34B4B",
+        "danger_hover": "#A73939",
+        "tab_bg": "#DBE8FF",
+        "tab_selected": "#FFFFFF",
+        "tab_hover": "#D2E2FF",
+        "tab_text": "#2F4E73",
+        "tree_bg": "#FFFFFF",
+        "tree_heading_bg": "#E7EFFF",
+        "tree_heading_text": "#2A3D57",
+        "tree_selected": "#CFE0FF",
+        "chart_bg": "#FFFFFF",
+        "chart_axis": "#D8DFEA",
+        "chart_title": "#3A4A63",
+        "chart_label": "#5A6980",
+        "empty_text": "#6D7B90",
+        "invest_label": "#425268",
+    },
+    "dark": {
+        "window_bg": "#10141C",
+        "bg": "#161C27",
+        "card_bg": "#1D2533",
+        "card_border": "#2A3447",
+        "text": "#E8EEF8",
+        "muted": "#A8B6CE",
+        "primary": "#4A8CFF",
+        "primary_hover": "#3B77DD",
+        "secondary_bg": "#233044",
+        "secondary_hover": "#2C3B54",
+        "secondary_text": "#D3E1FA",
+        "danger": "#C95555",
+        "danger_hover": "#A93D3D",
+        "tab_bg": "#243045",
+        "tab_selected": "#1D2533",
+        "tab_hover": "#2A3952",
+        "tab_text": "#CCD9F0",
+        "tree_bg": "#1A2230",
+        "tree_heading_bg": "#273347",
+        "tree_heading_text": "#DFE9FA",
+        "tree_selected": "#33507A",
+        "chart_bg": "#1A2230",
+        "chart_axis": "#3A4961",
+        "chart_title": "#DCE8FB",
+        "chart_label": "#A9BCD8",
+        "empty_text": "#A9BCD8",
+        "invest_label": "#C7D6EF",
+    },
+}
+
 
 @dataclass
 class RecurrenceResult:
@@ -574,35 +635,50 @@ class FinanzasApp(tk.Tk):
         self.title("Mis Finanzas Personales")
         self.geometry("1320x810")
         self.minsize(1200, 740)
-        self.configure(bg="#F2F5FA")
+        self.dark_mode_var = tk.BooleanVar(value=False)
+        self.theme_name = "light"
+        self.colors = THEMES[self.theme_name]
+        self.configure(bg=self.colors["window_bg"])
 
         self.conn = get_connection()
         init_db(self.conn)
         apply_recurring_entries(self.conn)
 
-        self._set_style()
+        self._set_style(self.theme_name)
         self._build_ui()
         self.refresh_all()
         self.after_idle(self.refresh_all)
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
-    def _set_style(self) -> None:
+    def _set_style(self, theme_name: str) -> None:
         style = ttk.Style(self)
         try:
             style.theme_use("clam")
         except tk.TclError:
             pass
 
-        bg = "#EAF2FF"
-        card_bg = "#FFFFFF"
-        text = "#1C2A3A"
-        muted = "#4F6480"
-        primary = "#2E77F3"
-        primary_hover = "#1F63D3"
-        danger = "#D34B4B"
+        self.theme_name = theme_name
+        self.colors = THEMES[theme_name]
+        self.configure(bg=self.colors["window_bg"])
+
+        bg = self.colors["bg"]
+        card_bg = self.colors["card_bg"]
+        text = self.colors["text"]
+        muted = self.colors["muted"]
+        primary = self.colors["primary"]
+        primary_hover = self.colors["primary_hover"]
+        danger = self.colors["danger"]
+        danger_hover = self.colors["danger_hover"]
+
+        style.configure("TFrame", background=bg)
+        style.configure("TLabel", background=bg, foreground=text)
+        style.configure("TLabelframe", background=card_bg, bordercolor=self.colors["card_border"], relief="solid")
+        style.configure("TLabelframe.Label", background=card_bg, foreground=text)
+        style.configure("TCheckbutton", background=bg, foreground=text)
+        style.configure("TRadiobutton", background=bg, foreground=text)
 
         style.configure("Root.TFrame", background=bg)
-        style.configure("Card.TLabelframe", background=card_bg, bordercolor="#CEDBF2", relief="solid")
+        style.configure("Card.TLabelframe", background=card_bg, bordercolor=self.colors["card_border"], relief="solid")
         style.configure("Card.TLabelframe.Label", background=card_bg, foreground=text, font=("Segoe UI", 10, "bold"))
         style.configure("Header.TLabel", background=bg, foreground=text, font=("Segoe UI", 20, "bold"))
         style.configure("SubHeader.TLabel", background=bg, foreground=muted, font=("Segoe UI", 10))
@@ -610,25 +686,54 @@ class FinanzasApp(tk.Tk):
 
         style.configure("Accent.TButton", font=("Segoe UI", 10, "bold"), padding=(12, 8), foreground="#FFFFFF", background=primary, borderwidth=0)
         style.map("Accent.TButton", background=[("active", primary_hover), ("pressed", primary_hover)])
-        style.configure("Secondary.TButton", font=("Segoe UI", 10), padding=(12, 8), background="#E1ECFF", foreground="#28476B")
-        style.map("Secondary.TButton", background=[("active", "#D4E4FF")])
+        style.configure(
+            "Secondary.TButton",
+            font=("Segoe UI", 10),
+            padding=(12, 8),
+            background=self.colors["secondary_bg"],
+            foreground=self.colors["secondary_text"],
+        )
+        style.map("Secondary.TButton", background=[("active", self.colors["secondary_hover"])])
         style.configure("Danger.TButton", font=("Segoe UI", 10, "bold"), padding=(12, 8), background=danger, foreground="#FFFFFF")
-        style.map("Danger.TButton", background=[("active", "#A73939")])
+        style.map("Danger.TButton", background=[("active", danger_hover)])
 
         style.configure("Modern.TNotebook", background=bg, borderwidth=0)
-        style.configure("Modern.TNotebook.Tab", font=("Segoe UI", 10, "bold"), padding=(16, 10), background="#DBE8FF", foreground="#2F4E73")
+        style.configure(
+            "Modern.TNotebook.Tab",
+            font=("Segoe UI", 10, "bold"),
+            padding=(16, 10),
+            background=self.colors["tab_bg"],
+            foreground=self.colors["tab_text"],
+        )
         style.map(
             "Modern.TNotebook.Tab",
-            background=[("selected", "#FFFFFF"), ("active", "#D2E2FF")],
+            background=[("selected", self.colors["tab_selected"]), ("active", self.colors["tab_hover"])],
             foreground=[("selected", text)],
         )
 
-        style.configure("Modern.Treeview", rowheight=30, font=("Segoe UI", 10), fieldbackground="#FFFFFF", background="#FFFFFF")
-        style.configure("Modern.Treeview.Heading", font=("Segoe UI", 10, "bold"), background="#E7EFFF", foreground="#2A3D57")
-        style.map("Modern.Treeview", background=[("selected", "#CFE0FF")], foreground=[("selected", text)])
+        style.configure(
+            "Modern.Treeview",
+            rowheight=30,
+            font=("Segoe UI", 10),
+            fieldbackground=self.colors["tree_bg"],
+            background=self.colors["tree_bg"],
+            foreground=text,
+        )
+        style.configure(
+            "Modern.Treeview.Heading",
+            font=("Segoe UI", 10, "bold"),
+            background=self.colors["tree_heading_bg"],
+            foreground=self.colors["tree_heading_text"],
+        )
+        style.map("Modern.Treeview", background=[("selected", self.colors["tree_selected"])], foreground=[("selected", text)])
 
-        style.configure("TEntry", padding=6)
-        style.configure("TCombobox", padding=4)
+        style.configure("TEntry", padding=6, fieldbackground=card_bg, foreground=text)
+        style.configure("TCombobox", padding=4, fieldbackground=card_bg, foreground=text)
+
+        if hasattr(self, "chart_canvas"):
+            self.chart_canvas.configure(bg=self.colors["chart_bg"])
+        if hasattr(self, "invest_chart"):
+            self.invest_chart.configure(bg=self.colors["chart_bg"])
 
     def _build_ui(self) -> None:
         root = ttk.Frame(self, padding=12, style="Root.TFrame")
@@ -659,6 +764,13 @@ class FinanzasApp(tk.Tk):
 
         ttk.Button(filters, text="Aplicar periodo", command=self.refresh_all, style="Accent.TButton").pack(side="left")
         ttk.Button(filters, text="Aplicar recurrencias ahora", command=self.apply_recurrences_now, style="Secondary.TButton").pack(side="left", padx=(8, 0))
+        self.theme_toggle_btn = ttk.Button(
+            filters,
+            text="🌙 Modo oscuro",
+            command=self.toggle_theme,
+            style="Secondary.TButton",
+        )
+        self.theme_toggle_btn.pack(side="right", padx=(0, 8))
         ttk.Button(
             filters,
             text="Resetear base de datos",
@@ -1082,8 +1194,15 @@ class FinanzasApp(tk.Tk):
         bar_w = group_w * 0.32
         max_h = height - 70
 
-        self.chart_canvas.create_line(pad, base_y, width - pad, base_y, fill="#D8DFEA")
-        self.chart_canvas.create_text(pad, 14, text="Ingresos vs gastos (6 meses)", anchor="w", fill="#3A4A63", font=("Segoe UI", 11, "bold"))
+        self.chart_canvas.create_line(pad, base_y, width - pad, base_y, fill=self.colors["chart_axis"])
+        self.chart_canvas.create_text(
+            pad,
+            14,
+            text="Ingresos vs gastos (6 meses)",
+            anchor="w",
+            fill=self.colors["chart_title"],
+            font=("Segoe UI", 11, "bold"),
+        )
 
         for idx, (m, inc, exp) in enumerate(series):
             center = pad + (idx + 0.5) * group_w
@@ -1091,7 +1210,7 @@ class FinanzasApp(tk.Tk):
             h_exp = (exp / max_value) * max_h
             self.chart_canvas.create_rectangle(center - bar_w - 2, base_y - h_inc, center - 2, base_y, fill="#1E9E68", outline="")
             self.chart_canvas.create_rectangle(center + 2, base_y - h_exp, center + bar_w + 2, base_y, fill="#D14A5B", outline="")
-            self.chart_canvas.create_text(center, base_y + 12, text=MONTH_NAMES[m][:3], fill="#5A6980")
+            self.chart_canvas.create_text(center, base_y + 12, text=MONTH_NAMES[m][:3], fill=self.colors["chart_label"])
 
     def refresh_accounts(self) -> None:
         for item in self.accounts_tree.get_children():
@@ -1145,7 +1264,7 @@ class FinanzasApp(tk.Tk):
         w = max(600, self.invest_chart.winfo_width())
         total = sum(by_type.values())
         if total <= 0:
-            self.invest_chart.create_text(w / 2, 70, text="Sin datos de inversiones", fill="#6D7B90")
+            self.invest_chart.create_text(w / 2, 70, text="Sin datos de inversiones", fill=self.colors["empty_text"])
             return
 
         colors = ["#2C7BE5", "#00A5A8", "#F29E4C", "#A66CFF", "#E05263", "#48BB78"]
@@ -1155,8 +1274,28 @@ class FinanzasApp(tk.Tk):
             seg = usable * (value / total)
             color = colors[idx % len(colors)]
             self.invest_chart.create_rectangle(x, 28, x + seg, 68, fill=color, outline="")
-            self.invest_chart.create_text(x + 4, 76, text=f"{name} ({value / total * 100:.0f}%)", anchor="nw", fill="#425268")
+            self.invest_chart.create_text(
+                x + 4,
+                76,
+                text=f"{name} ({value / total * 100:.0f}%)",
+                anchor="nw",
+                fill=self.colors["invest_label"],
+            )
             x += seg
+
+    def toggle_theme(self) -> None:
+        next_theme = "dark" if self.theme_name == "light" else "light"
+        self.dark_mode_var.set(next_theme == "dark")
+        self._set_style(next_theme)
+        self._update_theme_button_text()
+        self.refresh_dashboard()
+        self.refresh_investments()
+
+    def _update_theme_button_text(self) -> None:
+        if hasattr(self, "theme_toggle_btn"):
+            self.theme_toggle_btn.configure(
+                text="☀️ Modo claro" if self.theme_name == "dark" else "🌙 Modo oscuro"
+            )
 
     def refresh_recurrences(self) -> None:
         for item in self.rec_tree.get_children():
