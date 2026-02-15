@@ -703,10 +703,23 @@ class FinanzasApp(tk.Tk):
 
         self._set_style(self.theme_name)
         self._build_ui()
+        self.bind("<Map>", self._on_window_map, add="+")
         self._update_theme_button_text()
+        self._schedule_titlebar_theme_sync()
         self.refresh_all()
         self.after_idle(self.refresh_all)
         self.protocol("WM_DELETE_WINDOW", self.on_close)
+
+    def _schedule_titlebar_theme_sync(self) -> None:
+        """Reintenta aplicar el tema de barra nativa para cubrir arranque/restauraciones."""
+        if sys.platform != "win32":
+            return
+        for delay in (0, 120, 350, 800):
+            self.after(delay, self._apply_native_titlebar_theme)
+
+    def _on_window_map(self, _event: tk.Event) -> None:
+        """Al mostrarse la ventana, volver a forzar el tema de barra nativa."""
+        self._schedule_titlebar_theme_sync()
 
     def _apply_native_titlebar_theme(self) -> None:
         """Intenta sincronizar la barra de título nativa con el tema (solo Windows)."""
@@ -958,7 +971,7 @@ class FinanzasApp(tk.Tk):
         if hasattr(self, "invest_chart"):
             self.invest_chart.configure(bg=self.colors["chart_bg"])
 
-        self.after_idle(self._apply_native_titlebar_theme)
+        self._schedule_titlebar_theme_sync()
 
     def _build_ui(self) -> None:
         root = ttk.Frame(self, padding=12, style="Root.TFrame")
@@ -1516,6 +1529,7 @@ class FinanzasApp(tk.Tk):
         next_theme = "dark" if self.theme_name == "light" else "light"
         self.dark_mode_var.set(next_theme == "dark")
         self._set_style(next_theme)
+        self._schedule_titlebar_theme_sync()
         set_config(self.conn, "theme", next_theme)
         self._update_theme_button_text()
         self.refresh_dashboard()

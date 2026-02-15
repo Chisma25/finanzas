@@ -21,7 +21,7 @@ python3 finanzas_gui.py
   - Pestañas y tablas con estilo visual más actual
   - Toggle de tema claro/oscuro para adaptar la interfaz a tu preferencia
   - La preferencia de tema queda guardada al cerrar y se restaura al abrir
-  - En Windows compatible, la barra de título nativa también se oscurece al activar modo oscuro (incluyendo fallback para versiones donde Tk devuelve handle cliente)
+  - En Windows compatible, la barra de título nativa también se oscurece al activar modo oscuro y se reaplica al arrancar para respetar la preferencia guardada
 
 - **Resumen visual** con:
   - Balance, ingresos y gastos del periodo
