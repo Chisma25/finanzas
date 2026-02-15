@@ -805,12 +805,16 @@ class FinanzasApp(tk.Tk):
             bordercolor=self.colors["card_border"],
             lightcolor=self.colors["card_border"],
             darkcolor=self.colors["card_border"],
-            relief="solid",
+            focuscolor=self.colors["tab_bg"],
+            relief="flat",
         )
         style.map(
             "Modern.TNotebook.Tab",
             background=[("selected", self.colors["tab_selected"]), ("active", self.colors["tab_hover"])],
             foreground=[("selected", text)],
+            bordercolor=[("selected", self.colors["card_border"]), ("active", self.colors["card_border"])],
+            lightcolor=[("selected", self.colors["card_border"]), ("active", self.colors["card_border"])],
+            darkcolor=[("selected", self.colors["card_border"]), ("active", self.colors["card_border"])],
         )
 
         style.configure(
