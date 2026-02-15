@@ -68,13 +68,13 @@ THEMES = {
         "card_border": "#2A3447",
         "text": "#E8EEF8",
         "muted": "#A8B6CE",
-        "primary": "#4A8CFF",
-        "primary_hover": "#3B77DD",
+        "primary": "#355A86",
+        "primary_hover": "#2E4F77",
         "secondary_bg": "#233044",
         "secondary_hover": "#2C3B54",
         "secondary_text": "#D3E1FA",
-        "danger": "#C95555",
-        "danger_hover": "#A93D3D",
+        "danger": "#8B4A4A",
+        "danger_hover": "#733D3D",
         "tab_bg": "#243045",
         "tab_selected": "#1D2533",
         "tab_hover": "#2A3952",
@@ -716,7 +716,15 @@ class FinanzasApp(tk.Tk):
 
         style.configure("TFrame", background=bg)
         style.configure("TLabel", background=bg, foreground=text)
-        style.configure("TLabelframe", background=card_bg, bordercolor=self.colors["card_border"], relief="solid")
+        style.configure(
+            "TLabelframe",
+            background=card_bg,
+            bordercolor=self.colors["card_border"],
+            lightcolor=self.colors["card_border"],
+            darkcolor=self.colors["card_border"],
+            relief="solid",
+            borderwidth=1,
+        )
         style.configure("TLabelframe.Label", background=card_bg, foreground=text)
         style.configure("TCheckbutton", background=bg, foreground=text)
         style.map("TCheckbutton", background=[("active", bg)], foreground=[("disabled", muted)])
@@ -739,7 +747,18 @@ class FinanzasApp(tk.Tk):
         style.configure("SubHeader.TLabel", background=bg, foreground=muted, font=("Segoe UI", 10))
         style.configure("MetricValue.TLabel", background=card_bg, foreground=text, font=("Segoe UI", 18, "bold"))
 
-        style.configure("Accent.TButton", font=("Segoe UI", 10, "bold"), padding=(12, 8), foreground="#FFFFFF", background=primary, borderwidth=0)
+        style.configure(
+            "Accent.TButton",
+            font=("Segoe UI", 10, "bold"),
+            padding=(12, 8),
+            foreground="#FFFFFF",
+            background=primary,
+            borderwidth=1,
+            bordercolor=self.colors["card_border"],
+            lightcolor=self.colors["card_border"],
+            darkcolor=self.colors["card_border"],
+            relief="solid",
+        )
         style.map("Accent.TButton", background=[("active", primary_hover), ("pressed", primary_hover)])
         style.configure(
             "Secondary.TButton",
@@ -747,9 +766,25 @@ class FinanzasApp(tk.Tk):
             padding=(12, 8),
             background=self.colors["secondary_bg"],
             foreground=self.colors["secondary_text"],
+            borderwidth=1,
+            bordercolor=self.colors["card_border"],
+            lightcolor=self.colors["card_border"],
+            darkcolor=self.colors["card_border"],
+            relief="solid",
         )
         style.map("Secondary.TButton", background=[("active", self.colors["secondary_hover"])])
-        style.configure("Danger.TButton", font=("Segoe UI", 10, "bold"), padding=(12, 8), background=danger, foreground="#FFFFFF")
+        style.configure(
+            "Danger.TButton",
+            font=("Segoe UI", 10, "bold"),
+            padding=(12, 8),
+            background=danger,
+            foreground="#FFFFFF",
+            borderwidth=1,
+            bordercolor=self.colors["card_border"],
+            lightcolor=self.colors["card_border"],
+            darkcolor=self.colors["card_border"],
+            relief="solid",
+        )
         style.map("Danger.TButton", background=[("active", danger_hover)])
 
         style.configure(
@@ -767,6 +802,10 @@ class FinanzasApp(tk.Tk):
             padding=(16, 10),
             background=self.colors["tab_bg"],
             foreground=self.colors["tab_text"],
+            bordercolor=self.colors["card_border"],
+            lightcolor=self.colors["card_border"],
+            darkcolor=self.colors["card_border"],
+            relief="solid",
         )
         style.map(
             "Modern.TNotebook.Tab",
