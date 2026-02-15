@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import sqlite3
+import sys
 import tkinter as tk
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -707,6 +708,32 @@ class FinanzasApp(tk.Tk):
         self.after_idle(self.refresh_all)
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
+    def _apply_native_titlebar_theme(self) -> None:
+        """Intenta sincronizar la barra de título nativa con el tema (solo Windows)."""
+        if sys.platform != "win32":
+            return
+
+        try:
+            import ctypes
+
+            hwnd = self.winfo_id()
+            enabled = ctypes.c_int(1 if self.theme_name == "dark" else 0)
+            set_attr = ctypes.windll.dwmapi.DwmSetWindowAttribute
+
+            # Windows 10/11: el atributo puede ser 20 o 19 según versión.
+            for attribute in (20, 19):
+                result = set_attr(
+                    ctypes.c_void_p(hwnd),
+                    ctypes.c_uint(attribute),
+                    ctypes.byref(enabled),
+                    ctypes.sizeof(enabled),
+                )
+                if result == 0:
+                    break
+        except Exception:
+            # Si falla, continuamos sin romper la app ni la UI existente.
+            return
+
     def _set_style(self, theme_name: str) -> None:
         style = ttk.Style(self)
         try:
@@ -901,6 +928,8 @@ class FinanzasApp(tk.Tk):
             self.chart_canvas.configure(bg=self.colors["chart_bg"])
         if hasattr(self, "invest_chart"):
             self.invest_chart.configure(bg=self.colors["chart_bg"])
+
+        self.after_idle(self._apply_native_titlebar_theme)
 
     def _build_ui(self) -> None:
         root = ttk.Frame(self, padding=12, style="Root.TFrame")
