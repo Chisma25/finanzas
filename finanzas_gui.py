@@ -61,6 +61,8 @@ THEMES = {
         "input_fg": "#1C2A3A",
         "input_border": "#AEBFD9",
         "input_readonly_bg": "#F3F7FF",
+        "combo_arrow_bg": "#E6EEFD",
+        "combo_arrow_active_bg": "#D8E5FF",
         "check_select": "#E1ECFF",
     },
     "dark": {
@@ -96,6 +98,8 @@ THEMES = {
         "input_fg": "#E8EEF8",
         "input_border": "#3C4A62",
         "input_readonly_bg": "#242F42",
+        "combo_arrow_bg": "#2B3850",
+        "combo_arrow_active_bg": "#344764",
         "check_select": "#2C3B54",
     },
 }
@@ -951,6 +955,7 @@ class FinanzasApp(tk.Tk):
             padding=4,
             fieldbackground=self.colors["input_bg"],
             foreground=self.colors["input_fg"],
+            background=self.colors["combo_arrow_bg"],
             bordercolor=self.colors["input_border"],
             darkcolor=self.colors["input_border"],
             lightcolor=self.colors["input_border"],
@@ -961,6 +966,7 @@ class FinanzasApp(tk.Tk):
             "TCombobox",
             fieldbackground=[("readonly", self.colors["input_readonly_bg"]), ("!readonly", self.colors["input_bg"])],
             foreground=[("readonly", self.colors["input_fg"]), ("!readonly", self.colors["input_fg"])],
+            background=[("readonly", self.colors["combo_arrow_bg"]), ("active", self.colors["combo_arrow_active_bg"])],
             selectbackground=[("readonly", self.colors["input_readonly_bg"])],
             selectforeground=[("readonly", self.colors["input_fg"])],
             arrowcolor=[("readonly", self.colors["text"]), ("active", self.colors["text"])],
