@@ -49,6 +49,7 @@ THEMES = {
         "tree_heading_bg": "#E7EFFF",
         "tree_heading_text": "#2A3D57",
         "tree_selected": "#CFE0FF",
+        "tree_border": "#B9C9DF",
         "chart_bg": "#FFFFFF",
         "chart_axis": "#D8DFEA",
         "chart_title": "#3A4A63",
@@ -83,6 +84,7 @@ THEMES = {
         "tree_heading_bg": "#273347",
         "tree_heading_text": "#DFE9FA",
         "tree_selected": "#33507A",
+        "tree_border": "#33435A",
         "chart_bg": "#1A2230",
         "chart_axis": "#3A4961",
         "chart_title": "#DCE8FB",
@@ -824,12 +826,29 @@ class FinanzasApp(tk.Tk):
             fieldbackground=self.colors["tree_bg"],
             background=self.colors["tree_bg"],
             foreground=text,
+            borderwidth=1,
+            relief="solid",
+            bordercolor=self.colors["tree_border"],
+            lightcolor=self.colors["tree_border"],
+            darkcolor=self.colors["tree_border"],
         )
         style.configure(
             "Modern.Treeview.Heading",
             font=("Segoe UI", 10, "bold"),
             background=self.colors["tree_heading_bg"],
             foreground=self.colors["tree_heading_text"],
+            relief="flat",
+            borderwidth=1,
+            bordercolor=self.colors["tree_border"],
+            lightcolor=self.colors["tree_border"],
+            darkcolor=self.colors["tree_border"],
+        )
+        style.map(
+            "Modern.Treeview.Heading",
+            background=[("active", self.colors["tree_heading_bg"])],
+            bordercolor=[("active", self.colors["tree_border"])],
+            lightcolor=[("active", self.colors["tree_border"])],
+            darkcolor=[("active", self.colors["tree_border"])],
         )
         style.map("Modern.Treeview", background=[("selected", self.colors["tree_selected"])], foreground=[("selected", text)])
 
