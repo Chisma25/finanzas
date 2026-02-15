@@ -863,6 +863,10 @@ class FinanzasApp(tk.Tk):
         )
         style.map("Modern.Treeview", background=[("selected", self.colors["tree_selected"])], foreground=[("selected", text)])
 
+        # Estado de recurrencias más visible (activa/pausada)
+        style.configure("RecurrenceActive.Treeview", foreground=text)
+        style.configure("RecurrencePaused.Treeview", foreground=self.colors["muted"])
+
         style.configure(
             "TEntry",
             padding=6,
@@ -1482,6 +1486,8 @@ class FinanzasApp(tk.Tk):
             ultimo = "-"
             if row["ultimo_year"] and row["ultimo_month"]:
                 ultimo = f"{row['ultimo_year']}-{row['ultimo_month']:02d}"
+            estado_texto = "✅ Activa" if row["activa"] else "⏸ Pausada"
+            tag = "rec_active" if row["activa"] else "rec_paused"
             self.rec_tree.insert(
                 "",
                 "end",
@@ -1492,10 +1498,14 @@ class FinanzasApp(tk.Tk):
                     row["categoria_tipo"],
                     formato_eur(row["monto"]),
                     row["cuenta_nombre"] or "-",
-                    "Activa" if row["activa"] else "Pausada",
+                    estado_texto,
                     ultimo,
                 ),
+                tags=(tag,),
             )
+
+        self.rec_tree.tag_configure("rec_active", foreground=self.colors["text"])
+        self.rec_tree.tag_configure("rec_paused", foreground=self.colors["muted"])
 
     def refresh_all(self) -> None:
         self.refresh_period_options()
