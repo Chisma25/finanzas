@@ -55,6 +55,11 @@ THEMES = {
         "chart_label": "#5A6980",
         "empty_text": "#6D7B90",
         "invest_label": "#425268",
+        "input_bg": "#FFFFFF",
+        "input_fg": "#1C2A3A",
+        "input_border": "#AEBFD9",
+        "input_readonly_bg": "#F3F7FF",
+        "check_select": "#E1ECFF",
     },
     "dark": {
         "window_bg": "#10141C",
@@ -84,6 +89,11 @@ THEMES = {
         "chart_label": "#A9BCD8",
         "empty_text": "#A9BCD8",
         "invest_label": "#C7D6EF",
+        "input_bg": "#1B2331",
+        "input_fg": "#E8EEF8",
+        "input_border": "#3C4A62",
+        "input_readonly_bg": "#242F42",
+        "check_select": "#2C3B54",
     },
 }
 
@@ -192,6 +202,15 @@ def init_db(conn: sqlite3.Connection) -> None:
         """
     )
     migrate_recurrencias_schema(conn)
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS app_config (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+        """
+    )
     conn.commit()
 
 
@@ -629,6 +648,24 @@ class EditInvestmentDialog(tk.Toplevel):
         self.destroy()
 
 
+def get_config(conn: sqlite3.Connection, key: str, default: str = "") -> str:
+    row = conn.execute("SELECT value FROM app_config WHERE key = ?", (key,)).fetchone()
+    if row is None:
+        return default
+    return str(row["value"])
+
+
+def set_config(conn: sqlite3.Connection, key: str, value: str) -> None:
+    conn.execute(
+        """
+        INSERT INTO app_config (key, value) VALUES (?, ?)
+        ON CONFLICT(key) DO UPDATE SET value=excluded.value
+        """,
+        (key, value),
+    )
+    conn.commit()
+
+
 class FinanzasApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
@@ -636,13 +673,19 @@ class FinanzasApp(tk.Tk):
         self.geometry("1320x810")
         self.minsize(1200, 740)
         self.dark_mode_var = tk.BooleanVar(value=False)
-        self.theme_name = "light"
-        self.colors = THEMES[self.theme_name]
-        self.configure(bg=self.colors["window_bg"])
 
         self.conn = get_connection()
         init_db(self.conn)
         apply_recurring_entries(self.conn)
+
+        preferred_theme = get_config(self.conn, "theme", "light")
+        if preferred_theme not in THEMES:
+            preferred_theme = "light"
+
+        self.theme_name = preferred_theme
+        self.dark_mode_var.set(preferred_theme == "dark")
+        self.colors = THEMES[self.theme_name]
+        self.configure(bg=self.colors["window_bg"])
 
         self._set_style(self.theme_name)
         self._build_ui()
@@ -675,6 +718,9 @@ class FinanzasApp(tk.Tk):
         style.configure("TLabelframe", background=card_bg, bordercolor=self.colors["card_border"], relief="solid")
         style.configure("TLabelframe.Label", background=card_bg, foreground=text)
         style.configure("TCheckbutton", background=bg, foreground=text)
+        style.map("TCheckbutton", background=[("active", bg)], foreground=[("disabled", muted)])
+        style.configure("App.TCheckbutton", background=bg, foreground=text, indicatorcolor=self.colors["input_border"])
+        style.map("App.TCheckbutton", background=[("active", bg)], foreground=[("disabled", muted)])
         style.configure("TRadiobutton", background=bg, foreground=text)
 
         style.configure("Root.TFrame", background=bg)
@@ -727,8 +773,35 @@ class FinanzasApp(tk.Tk):
         )
         style.map("Modern.Treeview", background=[("selected", self.colors["tree_selected"])], foreground=[("selected", text)])
 
-        style.configure("TEntry", padding=6, fieldbackground=card_bg, foreground=text)
-        style.configure("TCombobox", padding=4, fieldbackground=card_bg, foreground=text)
+        style.configure(
+            "TEntry",
+            padding=6,
+            fieldbackground=self.colors["input_bg"],
+            foreground=self.colors["input_fg"],
+            insertcolor=self.colors["input_fg"],
+            bordercolor=self.colors["input_border"],
+            darkcolor=self.colors["input_border"],
+            lightcolor=self.colors["input_border"],
+        )
+        style.configure(
+            "TCombobox",
+            padding=4,
+            fieldbackground=self.colors["input_bg"],
+            foreground=self.colors["input_fg"],
+            bordercolor=self.colors["input_border"],
+            darkcolor=self.colors["input_border"],
+            lightcolor=self.colors["input_border"],
+            arrowcolor=self.colors["text"],
+            arrowsize=13,
+        )
+        style.map(
+            "TCombobox",
+            fieldbackground=[("readonly", self.colors["input_readonly_bg"]), ("!readonly", self.colors["input_bg"])],
+            foreground=[("readonly", self.colors["input_fg"]), ("!readonly", self.colors["input_fg"])],
+            selectbackground=[("readonly", self.colors["input_readonly_bg"])],
+            selectforeground=[("readonly", self.colors["input_fg"])],
+            arrowcolor=[("readonly", self.colors["text"]), ("active", self.colors["text"])],
+        )
 
         if hasattr(self, "chart_canvas"):
             self.chart_canvas.configure(bg=self.colors["chart_bg"])
@@ -871,7 +944,7 @@ class FinanzasApp(tk.Tk):
 
         ttk.Label(top, text="Descripción").grid(row=2, column=0, sticky="w", pady=(8, 0))
         ttk.Entry(top, textvariable=self.mov_descripcion, width=60).grid(row=3, column=0, columnspan=4, sticky="we", padx=(0, 10), pady=(2, 0))
-        ttk.Checkbutton(top, text="Recurrente mensual", variable=self.mov_recurrente).grid(row=3, column=4, sticky="w", padx=(0, 10), pady=(2, 0))
+        ttk.Checkbutton(top, text="Recurrente mensual", variable=self.mov_recurrente, style="App.TCheckbutton").grid(row=3, column=4, sticky="w", padx=(0, 10), pady=(2, 0))
         ttk.Button(top, text="Guardar movimiento", command=self.add_movimiento, style="Accent.TButton").grid(row=3, column=5, padx=(8, 0))
 
         table_frame = ttk.LabelFrame(self.mov_tab, text=" Movimientos del periodo ", style="Card.TLabelframe", padding=8)
@@ -984,7 +1057,7 @@ class FinanzasApp(tk.Tk):
         ttk.Combobox(form, textvariable=self.inv_riesgo, values=["Bajo", "Medio", "Alto"], state="readonly", width=10).grid(
             row=1, column=6, sticky="w", padx=(0, 10), pady=(2, 0)
         )
-        ttk.Checkbutton(form, text="Recurrente mensual", variable=self.inv_recurrente).grid(row=1, column=7, padx=(8, 10), sticky="w", pady=(2, 0))
+        ttk.Checkbutton(form, text="Recurrente mensual", variable=self.inv_recurrente, style="App.TCheckbutton").grid(row=1, column=7, padx=(8, 10), sticky="w", pady=(2, 0))
         ttk.Label(
             form,
             text="(El valor actual se actualiza después desde 'Actualizar valor actual')",
@@ -1287,6 +1360,7 @@ class FinanzasApp(tk.Tk):
         next_theme = "dark" if self.theme_name == "light" else "light"
         self.dark_mode_var.set(next_theme == "dark")
         self._set_style(next_theme)
+        set_config(self.conn, "theme", next_theme)
         self._update_theme_button_text()
         self.refresh_dashboard()
         self.refresh_investments()
@@ -1733,6 +1807,7 @@ class FinanzasApp(tk.Tk):
         messagebox.showinfo("Base de datos reseteada", "Todos los datos fueron eliminados correctamente.")
 
     def on_close(self) -> None:
+        set_config(self.conn, "theme", self.theme_name)
         self.conn.close()
         self.destroy()
 
