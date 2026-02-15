@@ -716,20 +716,49 @@ class FinanzasApp(tk.Tk):
         try:
             import ctypes
 
+            self.update_idletasks()
             hwnd = self.winfo_id()
-            enabled = ctypes.c_int(1 if self.theme_name == "dark" else 0)
+            user32 = ctypes.windll.user32
             set_attr = ctypes.windll.dwmapi.DwmSetWindowAttribute
 
-            # Windows 10/11: el atributo puede ser 20 o 19 según versión.
+            # Tk a veces devuelve el handle cliente; usamos el root handle real de ventana.
+            root_hwnd = user32.GetAncestor(ctypes.c_void_p(hwnd), ctypes.c_uint(2))  # GA_ROOT
+            if not root_hwnd:
+                root_hwnd = ctypes.c_void_p(hwnd)
+
+            enabled = ctypes.c_int(1 if self.theme_name == "dark" else 0)
+
+            # Windows 10/11: modo oscuro en barra de título (atributo 20 o 19 según versión).
             for attribute in (20, 19):
-                result = set_attr(
-                    ctypes.c_void_p(hwnd),
+                set_attr(
+                    root_hwnd,
                     ctypes.c_uint(attribute),
                     ctypes.byref(enabled),
                     ctypes.sizeof(enabled),
                 )
-                if result == 0:
-                    break
+
+            # Windows 11: forzar color de barra para que no quede blanca en algunos temas.
+            if self.theme_name == "dark":
+                caption_color = ctypes.c_int(0x001B1B1B)  # COLORREF BGR
+                text_color = ctypes.c_int(0x00F0F0F0)
+            else:
+                caption_color = ctypes.c_int(0x00F2F2F2)
+                text_color = ctypes.c_int(0x00151515)
+
+            # 35: DWMWA_CAPTION_COLOR, 36: DWMWA_TEXT_COLOR
+            set_attr(root_hwnd, ctypes.c_uint(35), ctypes.byref(caption_color), ctypes.sizeof(caption_color))
+            set_attr(root_hwnd, ctypes.c_uint(36), ctypes.byref(text_color), ctypes.sizeof(text_color))
+
+            # Fuerza repintado no intrusivo de marco
+            user32.SetWindowPos(
+                root_hwnd,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0x0001 | 0x0002 | 0x0020 | 0x0400,  # NOSIZE|NOMOVE|FRAMECHANGED|NOOWNERZORDER
+            )
         except Exception:
             # Si falla, continuamos sin romper la app ni la UI existente.
             return
