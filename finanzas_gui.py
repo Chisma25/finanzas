@@ -1043,8 +1043,9 @@ class FinanzasApp(tk.Tk):
         }
 
         for col in cols:
-            self.mov_tree.heading(col, text=headers[col])
-            self.mov_tree.column(col, width=widths[col], anchor="e" if col == "monto" else "w")
+            anchor = "e" if col == "monto" else "w"
+            self.mov_tree.heading(col, text=headers[col], anchor=anchor)
+            self.mov_tree.column(col, width=widths[col], anchor=anchor)
 
         scr = ttk.Scrollbar(table_frame, orient="vertical", command=self.mov_tree.yview)
         self.mov_tree.configure(yscrollcommand=scr.set)
@@ -1087,8 +1088,9 @@ class FinanzasApp(tk.Tk):
         cols = ("id", "nombre", "banco", "tipo", "moneda", "saldo")
         self.accounts_tree = ttk.Treeview(table, columns=cols, show="headings", style="Modern.Treeview")
         for c, t, w in [("id", "ID", 50), ("nombre", "Nombre", 190), ("banco", "Banco", 170), ("tipo", "Tipo", 120), ("moneda", "Moneda", 90), ("saldo", "Saldo", 130)]:
-            self.accounts_tree.heading(c, text=t)
-            self.accounts_tree.column(c, width=w, anchor="e" if c == "saldo" else "w")
+            anchor = "e" if c == "saldo" else "w"
+            self.accounts_tree.heading(c, text=t, anchor=anchor)
+            self.accounts_tree.column(c, width=w, anchor=anchor)
 
         scr = ttk.Scrollbar(table, orient="vertical", command=self.accounts_tree.yview)
         self.accounts_tree.configure(yscrollcommand=scr.set)
@@ -1167,8 +1169,9 @@ class FinanzasApp(tk.Tk):
             ("riesgo", "Riesgo", 90),
             ("rent", "P/L", 110),
         ]:
-            self.inv_tree.heading(c, text=t)
-            self.inv_tree.column(c, width=w, anchor="e" if c in {"invertido", "actual", "rent"} else "w")
+            anchor = "e" if c in {"invertido", "actual", "rent"} else "w"
+            self.inv_tree.heading(c, text=t, anchor=anchor)
+            self.inv_tree.column(c, width=w, anchor=anchor)
 
         scr = ttk.Scrollbar(table, orient="vertical", command=self.inv_tree.yview)
         self.inv_tree.configure(yscrollcommand=scr.set)
@@ -1201,8 +1204,9 @@ class FinanzasApp(tk.Tk):
             ("estado", "Estado", 80),
             ("ultimo", "Último mes", 110),
         ]:
-            self.rec_tree.heading(c, text=t)
-            self.rec_tree.column(c, width=w, anchor="e" if c == "monto" else "w")
+            anchor = "e" if c == "monto" else "w"
+            self.rec_tree.heading(c, text=t, anchor=anchor)
+            self.rec_tree.column(c, width=w, anchor=anchor)
 
         scr = ttk.Scrollbar(table, orient="vertical", command=self.rec_tree.yview)
         self.rec_tree.configure(yscrollcommand=scr.set)
