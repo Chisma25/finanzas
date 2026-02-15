@@ -53,6 +53,7 @@ python3 finanzas_gui.py
   - Activar/desactivar
   - Eliminar
   - Aplicación mensual automática y manual
+  - El botón "Aplicar recurrencias ahora" aplica reglas hasta el mes/año actualmente seleccionado
 - **Reset global de datos:**
   - Botón "Resetear base de datos" con doble confirmación (`RESET`) para limpiar valores de prueba.
 

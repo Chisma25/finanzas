@@ -1877,9 +1877,17 @@ class FinanzasApp(tk.Tk):
         self.refresh_all()
 
     def apply_recurrences_now(self) -> None:
-        result = apply_recurring_entries(self.conn)
+        year, month = self.selected_year_month()
+        result = apply_recurring_entries(self.conn, today=date(year, month, 1))
         self.refresh_all()
-        messagebox.showinfo("Recurrencias", f"Generadas: {result.created}\nSaltadas por fondos insuficientes: {result.skipped}")
+        messagebox.showinfo(
+            "Recurrencias",
+            (
+                f"Periodo aplicado hasta: {year:04d}-{month:02d}\n"
+                f"Generadas: {result.created}\n"
+                f"Saltadas por fondos insuficientes: {result.skipped}"
+            ),
+        )
 
     def reset_database_with_confirmation(self) -> None:
         if not messagebox.askyesno(
