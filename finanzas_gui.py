@@ -689,6 +689,7 @@ class FinanzasApp(tk.Tk):
 
         self._set_style(self.theme_name)
         self._build_ui()
+        self._update_theme_button_text()
         self.refresh_all()
         self.after_idle(self.refresh_all)
         self.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -724,7 +725,15 @@ class FinanzasApp(tk.Tk):
         style.configure("TRadiobutton", background=bg, foreground=text)
 
         style.configure("Root.TFrame", background=bg)
-        style.configure("Card.TLabelframe", background=card_bg, bordercolor=self.colors["card_border"], relief="solid")
+        style.configure(
+            "Card.TLabelframe",
+            background=card_bg,
+            bordercolor=self.colors["card_border"],
+            lightcolor=self.colors["card_border"],
+            darkcolor=self.colors["card_border"],
+            relief="solid",
+            borderwidth=1,
+        )
         style.configure("Card.TLabelframe.Label", background=card_bg, foreground=text, font=("Segoe UI", 10, "bold"))
         style.configure("Header.TLabel", background=bg, foreground=text, font=("Segoe UI", 20, "bold"))
         style.configure("SubHeader.TLabel", background=bg, foreground=muted, font=("Segoe UI", 10))
@@ -743,7 +752,15 @@ class FinanzasApp(tk.Tk):
         style.configure("Danger.TButton", font=("Segoe UI", 10, "bold"), padding=(12, 8), background=danger, foreground="#FFFFFF")
         style.map("Danger.TButton", background=[("active", danger_hover)])
 
-        style.configure("Modern.TNotebook", background=bg, borderwidth=0)
+        style.configure(
+            "Modern.TNotebook",
+            background=bg,
+            borderwidth=1,
+            bordercolor=self.colors["card_border"],
+            lightcolor=self.colors["card_border"],
+            darkcolor=self.colors["card_border"],
+            relief="solid",
+        )
         style.configure(
             "Modern.TNotebook.Tab",
             font=("Segoe UI", 10, "bold"),
@@ -900,7 +917,7 @@ class FinanzasApp(tk.Tk):
 
         graph_frame = ttk.LabelFrame(self.dashboard_tab, text=" Evolución 6 meses ", style="Card.TLabelframe")
         graph_frame.pack(fill="both", expand=True, pady=(10, 0))
-        self.chart_canvas = tk.Canvas(graph_frame, bg="#FFFFFF", height=260, highlightthickness=0)
+        self.chart_canvas = tk.Canvas(graph_frame, bg=self.colors["chart_bg"], height=260, highlightthickness=0)
         self.chart_canvas.pack(fill="both", expand=True, padx=8, pady=8)
         self._chart_redraw_job: str | None = None
         self.chart_canvas.bind("<Configure>", self.on_chart_canvas_resize)
@@ -1070,7 +1087,7 @@ class FinanzasApp(tk.Tk):
 
         chart_box = ttk.LabelFrame(self.investments_tab, text=" Composición de cartera ", style="Card.TLabelframe", padding=8)
         chart_box.pack(fill="x")
-        self.invest_chart = tk.Canvas(chart_box, bg="#FFFFFF", height=150, highlightthickness=0)
+        self.invest_chart = tk.Canvas(chart_box, bg=self.colors["chart_bg"], height=150, highlightthickness=0)
         self.invest_chart.pack(fill="x")
 
         table = ttk.LabelFrame(self.investments_tab, text=" Posiciones agregadas ", style="Card.TLabelframe", padding=8)
