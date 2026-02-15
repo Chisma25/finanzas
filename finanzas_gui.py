@@ -337,10 +337,21 @@ def month_lte(a: tuple[int, int], b: tuple[int, int]) -> bool:
 
 
 def get_available_cash(conn: sqlite3.Connection) -> float:
+    """Devuelve liquidez disponible sin crédito.
+
+    Si existen cuentas, el disponible se toma del saldo agregado de cuentas
+    (fuente de verdad más fiable porque ya incluye ajustes manuales/saldos iniciales).
+    Si no existen cuentas todavía, se mantiene el cálculo legacy por transacciones/inversión.
+    """
+    cuentas_count = conn.execute("SELECT COUNT(*) FROM cuentas").fetchone()[0]
+    if cuentas_count:
+        cuentas_total = conn.execute("SELECT COALESCE(SUM(saldo), 0) FROM cuentas").fetchone()[0]
+        return float(cuentas_total)
+
     ingresos = conn.execute("SELECT COALESCE(SUM(monto), 0) FROM transacciones WHERE tipo='ingreso'").fetchone()[0]
     gastos = conn.execute("SELECT COALESCE(SUM(monto), 0) FROM transacciones WHERE tipo='gasto'").fetchone()[0]
     invertido = conn.execute("SELECT COALESCE(SUM(monto_invertido), 0) FROM inversiones").fetchone()[0]
-    return ingresos - gastos - invertido
+    return float(ingresos - gastos - invertido)
 
 
 def upsert_investment(

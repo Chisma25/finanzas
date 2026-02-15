@@ -32,6 +32,7 @@ python3 finanzas_gui.py
   - Selector de años disponible desde el año actual hasta 2040.
 - **Control de liquidez (sin crédito):**
   - Gastos e inversiones quedan limitados por dinero disponible.
+  - Si tienes cuentas registradas, el disponible se calcula desde el saldo total de cuentas (incluyendo saldos iniciales manuales).
 - **Movimientos:**
   - Alta de ingresos/gastos con cuenta asociada
   - Exportación CSV del mes
