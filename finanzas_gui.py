@@ -1,0 +1,2011 @@
+#!/usr/bin/env python3
+"""Interfaz gráfica local para finanzas personales con paneles avanzados."""
+
+from __future__ import annotations
+
+import sqlite3
+import sys
+import tkinter as tk
+from dataclasses import dataclass
+from datetime import date, datetime
+from pathlib import Path
+from tkinter import messagebox, simpledialog, ttk
+
+DB_PATH = Path.home() / ".mis_finanzas.db"
+MONTH_NAMES = {
+    1: "Enero",
+    2: "Febrero",
+    3: "Marzo",
+    4: "Abril",
+    5: "Mayo",
+    6: "Junio",
+    7: "Julio",
+    8: "Agosto",
+    9: "Septiembre",
+    10: "Octubre",
+    11: "Noviembre",
+    12: "Diciembre",
+}
+
+THEMES = {
+    "light": {
+        "window_bg": "#F2F5FA",
+        "bg": "#EAF2FF",
+        "card_bg": "#FFFFFF",
+        "card_border": "#CEDBF2",
+        "text": "#1C2A3A",
+        "muted": "#4F6480",
+        "primary": "#2E77F3",
+        "primary_hover": "#1F63D3",
+        "secondary_bg": "#E1ECFF",
+        "secondary_hover": "#D4E4FF",
+        "secondary_text": "#28476B",
+        "danger": "#D34B4B",
+        "danger_hover": "#A73939",
+        "tab_bg": "#DBE8FF",
+        "tab_selected": "#FFFFFF",
+        "tab_hover": "#D2E2FF",
+        "tab_text": "#2F4E73",
+        "tree_bg": "#FFFFFF",
+        "tree_heading_bg": "#E7EFFF",
+        "tree_heading_text": "#2A3D57",
+        "tree_selected": "#CFE0FF",
+        "tree_border": "#B9C9DF",
+        "chart_bg": "#FFFFFF",
+        "chart_axis": "#D8DFEA",
+        "chart_title": "#3A4A63",
+        "chart_label": "#5A6980",
+        "empty_text": "#6D7B90",
+        "invest_label": "#425268",
+        "input_bg": "#FFFFFF",
+        "input_fg": "#1C2A3A",
+        "input_border": "#AEBFD9",
+        "input_readonly_bg": "#F3F7FF",
+        "combo_arrow_bg": "#E6EEFD",
+        "combo_arrow_active_bg": "#D8E5FF",
+        "check_select": "#E1ECFF",
+    },
+    "dark": {
+        "window_bg": "#10141C",
+        "bg": "#161C27",
+        "card_bg": "#1D2533",
+        "card_border": "#2A3447",
+        "text": "#E8EEF8",
+        "muted": "#A8B6CE",
+        "primary": "#355A86",
+        "primary_hover": "#2E4F77",
+        "secondary_bg": "#233044",
+        "secondary_hover": "#2C3B54",
+        "secondary_text": "#D3E1FA",
+        "danger": "#8B4A4A",
+        "danger_hover": "#733D3D",
+        "tab_bg": "#243045",
+        "tab_selected": "#1D2533",
+        "tab_hover": "#2A3952",
+        "tab_text": "#CCD9F0",
+        "tree_bg": "#1A2230",
+        "tree_heading_bg": "#273347",
+        "tree_heading_text": "#DFE9FA",
+        "tree_selected": "#33507A",
+        "tree_border": "#33435A",
+        "chart_bg": "#1A2230",
+        "chart_axis": "#3A4961",
+        "chart_title": "#DCE8FB",
+        "chart_label": "#A9BCD8",
+        "empty_text": "#A9BCD8",
+        "invest_label": "#C7D6EF",
+        "input_bg": "#1B2331",
+        "input_fg": "#E8EEF8",
+        "input_border": "#3C4A62",
+        "input_readonly_bg": "#242F42",
+        "combo_arrow_bg": "#2B3850",
+        "combo_arrow_active_bg": "#344764",
+        "check_select": "#2C3B54",
+    },
+}
+
+
+@dataclass
+class RecurrenceResult:
+    created: int = 0
+    skipped: int = 0
+
+
+def formato_eur(value: float) -> str:
+    return f"{value:,.2f} €".replace(",", "_").replace(".", ",").replace("_", ".")
+
+
+def normalize_asset(name: str) -> str:
+    return " ".join(name.strip().lower().split())
+
+
+def get_connection(db_path: Path = DB_PATH) -> sqlite3.Connection:
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) -> None:
+    columns = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column not in columns:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {ddl}")
+
+
+def init_db(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS transacciones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fecha TEXT NOT NULL,
+            tipo TEXT NOT NULL CHECK(tipo IN ('ingreso', 'gasto')),
+            categoria TEXT NOT NULL,
+            descripcion TEXT NOT NULL,
+            monto REAL NOT NULL CHECK(monto >= 0)
+        )
+        """
+    )
+    ensure_column(conn, "transacciones", "cuenta_id", "cuenta_id INTEGER")
+    ensure_column(conn, "transacciones", "origen_regla_id", "origen_regla_id INTEGER")
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS cuentas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL,
+            banco TEXT NOT NULL,
+            tipo TEXT NOT NULL,
+            moneda TEXT NOT NULL DEFAULT 'EUR',
+            saldo REAL NOT NULL DEFAULT 0,
+            notas TEXT,
+            creado_en TEXT NOT NULL
+        )
+        """
+    )
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS inversiones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL,
+            clave TEXT NOT NULL UNIQUE,
+            tipo TEXT NOT NULL,
+            broker TEXT,
+            monto_invertido REAL NOT NULL CHECK(monto_invertido >= 0),
+            valor_actual REAL NOT NULL CHECK(valor_actual >= 0),
+            riesgo TEXT NOT NULL,
+            fecha_actualizacion TEXT NOT NULL,
+            notas TEXT
+        )
+        """
+    )
+    ensure_column(conn, "inversiones", "clave", "clave TEXT")
+    ensure_column(conn, "inversiones", "fecha_actualizacion", "fecha_actualizacion TEXT")
+    ensure_column(conn, "inversiones", "notas", "notas TEXT")
+
+    migrate_investments_legacy_data(conn)
+
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_inversiones_clave ON inversiones(clave)")
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS recurrencias (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tipo TEXT NOT NULL CHECK(tipo IN ('ingreso', 'gasto', 'inversion')),
+            nombre TEXT NOT NULL,
+            categoria_tipo TEXT NOT NULL,
+            descripcion TEXT,
+            monto REAL NOT NULL,
+            valor_actual REAL,
+            riesgo TEXT,
+            broker TEXT,
+            cuenta_id INTEGER,
+            activa INTEGER NOT NULL DEFAULT 1,
+            inicio_year INTEGER NOT NULL,
+            inicio_month INTEGER NOT NULL,
+            ultimo_year INTEGER,
+            ultimo_month INTEGER,
+            creado_en TEXT NOT NULL
+        )
+        """
+    )
+    migrate_recurrencias_schema(conn)
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS app_config (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+        """
+    )
+    conn.commit()
+
+
+def migrate_recurrencias_schema(conn: sqlite3.Connection) -> None:
+    """Actualiza recurrencias legacy para permitir también ingresos recurrentes."""
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='recurrencias'"
+    ).fetchone()
+    if row is None:
+        return
+
+    sql = (row["sql"] or "").lower()
+    if "('ingreso', 'gasto', 'inversion')" in sql:
+        return
+
+    conn.execute("ALTER TABLE recurrencias RENAME TO recurrencias_old")
+    conn.execute(
+        """
+        CREATE TABLE recurrencias (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tipo TEXT NOT NULL CHECK(tipo IN ('ingreso', 'gasto', 'inversion')),
+            nombre TEXT NOT NULL,
+            categoria_tipo TEXT NOT NULL,
+            descripcion TEXT,
+            monto REAL NOT NULL,
+            valor_actual REAL,
+            riesgo TEXT,
+            broker TEXT,
+            cuenta_id INTEGER,
+            activa INTEGER NOT NULL DEFAULT 1,
+            inicio_year INTEGER NOT NULL,
+            inicio_month INTEGER NOT NULL,
+            ultimo_year INTEGER,
+            ultimo_month INTEGER,
+            creado_en TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        INSERT INTO recurrencias (
+            id, tipo, nombre, categoria_tipo, descripcion, monto, valor_actual, riesgo, broker,
+            cuenta_id, activa, inicio_year, inicio_month, ultimo_year, ultimo_month, creado_en
+        )
+        SELECT
+            id, tipo, nombre, categoria_tipo, descripcion, monto, valor_actual, riesgo, broker,
+            cuenta_id, activa, inicio_year, inicio_month, ultimo_year, ultimo_month, creado_en
+        FROM recurrencias_old
+        """
+    )
+    conn.execute("DROP TABLE recurrencias_old")
+
+
+def migrate_investments_legacy_data(conn: sqlite3.Connection) -> None:
+    """Migra bases antiguas sin `clave`/`fecha_actualizacion` y consolida duplicados por activo."""
+    rows = conn.execute(
+        """
+        SELECT id, nombre, tipo, broker, monto_invertido, valor_actual, riesgo,
+               COALESCE(fecha_actualizacion, '') AS fecha_actualizacion,
+               COALESCE(clave, '') AS clave
+        FROM inversiones
+        ORDER BY id
+        """
+    ).fetchall()
+
+    if not rows:
+        return
+
+    grouped: dict[str, list[sqlite3.Row]] = {}
+    for row in rows:
+        normalized = normalize_asset(row["nombre"])
+        grouped.setdefault(normalized, []).append(row)
+
+    today = date.today().isoformat()
+
+    for normalized, items in grouped.items():
+        keeper = items[0]
+        total_invertido = sum(float(r["monto_invertido"] or 0) for r in items)
+        total_actual = sum(float(r["valor_actual"] or 0) for r in items)
+
+        broker = ""
+        tipo = keeper["tipo"] or "Acción"
+        riesgo = keeper["riesgo"] or "Medio"
+        fecha_act = keeper["fecha_actualizacion"] or today
+        for candidate in items:
+            if not broker and candidate["broker"]:
+                broker = candidate["broker"]
+            if not candidate["fecha_actualizacion"]:
+                continue
+            fecha_act = candidate["fecha_actualizacion"]
+
+        conn.execute(
+            """
+            UPDATE inversiones
+            SET clave = ?,
+                tipo = ?,
+                broker = ?,
+                monto_invertido = ?,
+                valor_actual = ?,
+                riesgo = ?,
+                fecha_actualizacion = ?
+            WHERE id = ?
+            """,
+            (normalized, tipo, broker, total_invertido, total_actual, riesgo, fecha_act, keeper["id"]),
+        )
+
+        for duplicate in items[1:]:
+            conn.execute("DELETE FROM inversiones WHERE id = ?", (duplicate["id"],))
+
+
+def parse_iso_date(text: str) -> date:
+    return datetime.strptime(text, "%Y-%m-%d").date()
+
+
+def month_add(year: int, month: int, delta: int) -> tuple[int, int]:
+    total = (year * 12 + month - 1) + delta
+    return total // 12, total % 12 + 1
+
+
+def month_lte(a: tuple[int, int], b: tuple[int, int]) -> bool:
+    return a[0] < b[0] or (a[0] == b[0] and a[1] <= b[1])
+
+
+def get_available_cash(conn: sqlite3.Connection) -> float:
+    """Devuelve liquidez disponible sin crédito.
+
+    Si existen cuentas, el disponible se toma del saldo agregado de cuentas
+    (fuente de verdad más fiable porque ya incluye ajustes manuales/saldos iniciales).
+    Si no existen cuentas todavía, se mantiene el cálculo legacy por transacciones/inversión.
+    """
+    cuentas_count = conn.execute("SELECT COUNT(*) FROM cuentas").fetchone()[0]
+    if cuentas_count:
+        cuentas_total = conn.execute("SELECT COALESCE(SUM(saldo), 0) FROM cuentas").fetchone()[0]
+        return float(cuentas_total)
+
+    ingresos = conn.execute("SELECT COALESCE(SUM(monto), 0) FROM transacciones WHERE tipo='ingreso'").fetchone()[0]
+    gastos = conn.execute("SELECT COALESCE(SUM(monto), 0) FROM transacciones WHERE tipo='gasto'").fetchone()[0]
+    invertido = conn.execute("SELECT COALESCE(SUM(monto_invertido), 0) FROM inversiones").fetchone()[0]
+    return float(ingresos - gastos - invertido)
+
+
+def upsert_investment(
+    conn: sqlite3.Connection,
+    *,
+    nombre: str,
+    tipo: str,
+    broker: str,
+    invertido_delta: float,
+    valor_actual_delta: float,
+    riesgo: str,
+    fecha_text: str,
+) -> None:
+    inv_columns = {row["name"] for row in conn.execute("PRAGMA table_info(inversiones)").fetchall()}
+    has_legacy_fecha = "fecha" in inv_columns
+
+    clave = normalize_asset(nombre)
+    current = conn.execute("SELECT * FROM inversiones WHERE clave = ?", (clave,)).fetchone()
+
+    if current is None:
+        if has_legacy_fecha:
+            conn.execute(
+                """
+                INSERT INTO inversiones
+                (nombre, clave, tipo, broker, monto_invertido, valor_actual, riesgo, fecha_actualizacion, fecha, notas)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '')
+                """,
+                (
+                    nombre.strip(),
+                    clave,
+                    tipo,
+                    broker.strip(),
+                    invertido_delta,
+                    valor_actual_delta,
+                    riesgo,
+                    fecha_text,
+                    fecha_text,
+                ),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO inversiones (nombre, clave, tipo, broker, monto_invertido, valor_actual, riesgo, fecha_actualizacion, notas)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, '')
+                """,
+                (nombre.strip(), clave, tipo, broker.strip(), invertido_delta, valor_actual_delta, riesgo, fecha_text),
+            )
+    else:
+        if has_legacy_fecha:
+            conn.execute(
+                """
+                UPDATE inversiones
+                SET monto_invertido = monto_invertido + ?,
+                    valor_actual = valor_actual + ?,
+                    broker = ?,
+                    tipo = ?,
+                    riesgo = ?,
+                    fecha_actualizacion = ?,
+                    fecha = ?
+                WHERE id = ?
+                """,
+                (
+                    invertido_delta,
+                    valor_actual_delta,
+                    broker.strip() or current["broker"],
+                    tipo or current["tipo"],
+                    riesgo or current["riesgo"],
+                    fecha_text,
+                    fecha_text,
+                    current["id"],
+                ),
+            )
+        else:
+            conn.execute(
+                """
+                UPDATE inversiones
+                SET monto_invertido = monto_invertido + ?,
+                    valor_actual = valor_actual + ?,
+                    broker = ?,
+                    tipo = ?,
+                    riesgo = ?,
+                    fecha_actualizacion = ?
+                WHERE id = ?
+                """,
+                (
+                    invertido_delta,
+                    valor_actual_delta,
+                    broker.strip() or current["broker"],
+                    tipo or current["tipo"],
+                    riesgo or current["riesgo"],
+                    fecha_text,
+                    current["id"],
+                ),
+            )
+
+
+def apply_recurring_entries(conn: sqlite3.Connection, today: date | None = None) -> RecurrenceResult:
+    now = today or date.today()
+    current = (now.year, now.month)
+    result = RecurrenceResult()
+
+    rules = conn.execute("SELECT * FROM recurrencias WHERE activa = 1 ORDER BY id").fetchall()
+    for rule in rules:
+        if rule["ultimo_year"] is None or rule["ultimo_month"] is None:
+            next_month = (rule["inicio_year"], rule["inicio_month"])
+        else:
+            next_month = month_add(rule["ultimo_year"], rule["ultimo_month"], 1)
+
+        while month_lte(next_month, current):
+            y, m = next_month
+            fecha = f"{y:04d}-{m:02d}-01"
+
+            if rule["tipo"] == "gasto":
+                disponible = get_available_cash(conn)
+                if rule["monto"] > disponible:
+                    result.skipped += 1
+                    break
+
+                conn.execute(
+                    """
+                    INSERT INTO transacciones (fecha, tipo, categoria, descripcion, monto, cuenta_id, origen_regla_id)
+                    VALUES (?, 'gasto', ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        fecha,
+                        rule["categoria_tipo"],
+                        f"{rule['descripcion'] or rule['nombre']} (recurrente)",
+                        rule["monto"],
+                        rule["cuenta_id"],
+                        rule["id"],
+                    ),
+                )
+                if rule["cuenta_id"]:
+                    conn.execute("UPDATE cuentas SET saldo = saldo - ? WHERE id = ?", (rule["monto"], rule["cuenta_id"]))
+
+            if rule["tipo"] == "ingreso":
+                conn.execute(
+                    """
+                    INSERT INTO transacciones (fecha, tipo, categoria, descripcion, monto, cuenta_id, origen_regla_id)
+                    VALUES (?, 'ingreso', ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        fecha,
+                        rule["categoria_tipo"],
+                        f"{rule['descripcion'] or rule['nombre']} (recurrente)",
+                        rule["monto"],
+                        rule["cuenta_id"],
+                        rule["id"],
+                    ),
+                )
+                if rule["cuenta_id"]:
+                    conn.execute("UPDATE cuentas SET saldo = saldo + ? WHERE id = ?", (rule["monto"], rule["cuenta_id"]))
+
+            if rule["tipo"] == "inversion":
+                disponible = get_available_cash(conn)
+                if rule["monto"] > disponible:
+                    result.skipped += 1
+                    break
+
+                upsert_investment(
+                    conn,
+                    nombre=rule["nombre"],
+                    tipo=rule["categoria_tipo"],
+                    broker=rule["broker"] or "",
+                    invertido_delta=rule["monto"],
+                    valor_actual_delta=rule["valor_actual"] if rule["valor_actual"] is not None else rule["monto"],
+                    riesgo=rule["riesgo"] or "Medio",
+                    fecha_text=fecha,
+                )
+                if rule["cuenta_id"]:
+                    conn.execute("UPDATE cuentas SET saldo = saldo - ? WHERE id = ?", (rule["monto"], rule["cuenta_id"]))
+
+            conn.execute(
+                "UPDATE recurrencias SET ultimo_year = ?, ultimo_month = ? WHERE id = ?",
+                (y, m, rule["id"]),
+            )
+            result.created += 1
+            next_month = month_add(y, m, 1)
+
+    conn.commit()
+    return result
+
+
+def reset_all_data(conn: sqlite3.Connection) -> None:
+    """Borra todos los datos funcionales de la app conservando el esquema."""
+    conn.execute("DELETE FROM transacciones")
+    conn.execute("DELETE FROM cuentas")
+    conn.execute("DELETE FROM inversiones")
+    conn.execute("DELETE FROM recurrencias")
+    conn.commit()
+
+
+class EditAccountDialog(tk.Toplevel):
+    def __init__(self, parent: tk.Misc, data: sqlite3.Row):
+        super().__init__(parent)
+        self.title("Editar cuenta")
+        self.resizable(False, False)
+        self.result = None
+
+        self.nombre = tk.StringVar(value=data["nombre"])
+        self.banco = tk.StringVar(value=data["banco"])
+        self.tipo = tk.StringVar(value=data["tipo"])
+        self.moneda = tk.StringVar(value=data["moneda"])
+        self.saldo = tk.StringVar(value=str(data["saldo"]))
+
+        frm = ttk.Frame(self, padding=12)
+        frm.pack(fill="both", expand=True)
+
+        for i, (label, var) in enumerate(
+            [
+                ("Nombre", self.nombre),
+                ("Banco", self.banco),
+                ("Tipo", self.tipo),
+                ("Moneda", self.moneda),
+                ("Saldo", self.saldo),
+            ]
+        ):
+            ttk.Label(frm, text=label).grid(row=i, column=0, sticky="w")
+            ttk.Entry(frm, textvariable=var, width=28).grid(row=i, column=1, pady=2, sticky="w")
+
+        btns = ttk.Frame(frm)
+        btns.grid(row=6, column=0, columnspan=2, pady=(10, 0), sticky="e")
+        ttk.Button(btns, text="Cancelar", command=self.destroy).pack(side="right", padx=4)
+        ttk.Button(btns, text="Guardar", command=self.on_save).pack(side="right")
+
+        self.grab_set()
+        self.wait_visibility()
+
+    def on_save(self) -> None:
+        try:
+            saldo = float(self.saldo.get().strip())
+        except ValueError:
+            messagebox.showerror("Saldo inválido", "Saldo no numérico", parent=self)
+            return
+
+        if not self.nombre.get().strip() or not self.banco.get().strip():
+            messagebox.showerror("Campos", "Nombre y banco son obligatorios", parent=self)
+            return
+
+        self.result = {
+            "nombre": self.nombre.get().strip(),
+            "banco": self.banco.get().strip(),
+            "tipo": self.tipo.get().strip() or "Corriente",
+            "moneda": self.moneda.get().strip() or "EUR",
+            "saldo": saldo,
+        }
+        self.destroy()
+
+
+class EditInvestmentDialog(tk.Toplevel):
+    def __init__(self, parent: tk.Misc, data: sqlite3.Row):
+        super().__init__(parent)
+        self.title("Editar posición de inversión")
+        self.resizable(False, False)
+        self.result = None
+
+        self.nombre = tk.StringVar(value=data["nombre"])
+        self.tipo = tk.StringVar(value=data["tipo"])
+        self.broker = tk.StringVar(value=data["broker"] or "")
+        self.invertido = tk.StringVar(value=str(data["monto_invertido"]))
+        self.actual = tk.StringVar(value=str(data["valor_actual"]))
+        self.riesgo = tk.StringVar(value=data["riesgo"])
+
+        frm = ttk.Frame(self, padding=12)
+        frm.pack(fill="both", expand=True)
+
+        fields = [
+            ("Activo", self.nombre),
+            ("Tipo", self.tipo),
+            ("Broker", self.broker),
+            ("Total invertido", self.invertido),
+            ("Valor actual", self.actual),
+            ("Riesgo", self.riesgo),
+        ]
+        for i, (label, var) in enumerate(fields):
+            ttk.Label(frm, text=label).grid(row=i, column=0, sticky="w")
+            ttk.Entry(frm, textvariable=var, width=30).grid(row=i, column=1, pady=2, sticky="w")
+
+        btns = ttk.Frame(frm)
+        btns.grid(row=7, column=0, columnspan=2, pady=(10, 0), sticky="e")
+        ttk.Button(btns, text="Cancelar", command=self.destroy).pack(side="right", padx=4)
+        ttk.Button(btns, text="Guardar", command=self.on_save).pack(side="right")
+
+        self.grab_set()
+        self.wait_visibility()
+
+    def on_save(self) -> None:
+        try:
+            invertido = float(self.invertido.get().strip())
+            actual = float(self.actual.get().strip())
+        except ValueError:
+            messagebox.showerror("Valores", "Invertido y actual deben ser numéricos", parent=self)
+            return
+
+        if not self.nombre.get().strip():
+            messagebox.showerror("Campos", "Activo obligatorio", parent=self)
+            return
+
+        self.result = {
+            "nombre": self.nombre.get().strip(),
+            "tipo": self.tipo.get().strip() or "ETF",
+            "broker": self.broker.get().strip(),
+            "monto_invertido": max(invertido, 0),
+            "valor_actual": max(actual, 0),
+            "riesgo": self.riesgo.get().strip() or "Medio",
+        }
+        self.destroy()
+
+
+def get_config(conn: sqlite3.Connection, key: str, default: str = "") -> str:
+    row = conn.execute("SELECT value FROM app_config WHERE key = ?", (key,)).fetchone()
+    if row is None:
+        return default
+    return str(row["value"])
+
+
+def set_config(conn: sqlite3.Connection, key: str, value: str) -> None:
+    conn.execute(
+        """
+        INSERT INTO app_config (key, value) VALUES (?, ?)
+        ON CONFLICT(key) DO UPDATE SET value=excluded.value
+        """,
+        (key, value),
+    )
+    conn.commit()
+
+
+class FinanzasApp(tk.Tk):
+    def __init__(self) -> None:
+        super().__init__()
+        self.title("Mis Finanzas Personales")
+        self.geometry("1320x810")
+        self.minsize(1200, 740)
+        self.dark_mode_var = tk.BooleanVar(value=False)
+
+        self.conn = get_connection()
+        init_db(self.conn)
+        apply_recurring_entries(self.conn)
+
+        preferred_theme = get_config(self.conn, "theme", "light")
+        if preferred_theme not in THEMES:
+            preferred_theme = "light"
+
+        self.theme_name = preferred_theme
+        self.dark_mode_var.set(preferred_theme == "dark")
+        self.colors = THEMES[self.theme_name]
+        self.configure(bg=self.colors["window_bg"])
+
+        self._set_style(self.theme_name)
+        self._build_ui()
+        self.bind("<Map>", self._on_window_map, add="+")
+        self._update_theme_button_text()
+        self._schedule_titlebar_theme_sync()
+        self.refresh_all()
+        self.after_idle(self.refresh_all)
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
+
+    def _schedule_titlebar_theme_sync(self) -> None:
+        """Reintenta aplicar el tema de barra nativa para cubrir arranque/restauraciones."""
+        if sys.platform != "win32":
+            return
+        for delay in (0, 120, 350, 800):
+            self.after(delay, self._apply_native_titlebar_theme)
+
+    def _on_window_map(self, _event: tk.Event) -> None:
+        """Al mostrarse la ventana, volver a forzar el tema de barra nativa."""
+        self._schedule_titlebar_theme_sync()
+
+    def _apply_native_titlebar_theme(self) -> None:
+        """Intenta sincronizar la barra de título nativa con el tema (solo Windows)."""
+        if sys.platform != "win32":
+            return
+
+        try:
+            import ctypes
+
+            self.update_idletasks()
+            hwnd = self.winfo_id()
+            user32 = ctypes.windll.user32
+            set_attr = ctypes.windll.dwmapi.DwmSetWindowAttribute
+
+            # Tk a veces devuelve el handle cliente; usamos el root handle real de ventana.
+            root_hwnd = user32.GetAncestor(ctypes.c_void_p(hwnd), ctypes.c_uint(2))  # GA_ROOT
+            if not root_hwnd:
+                root_hwnd = ctypes.c_void_p(hwnd)
+
+            enabled = ctypes.c_int(1 if self.theme_name == "dark" else 0)
+
+            # Windows 10/11: modo oscuro en barra de título (atributo 20 o 19 según versión).
+            for attribute in (20, 19):
+                set_attr(
+                    root_hwnd,
+                    ctypes.c_uint(attribute),
+                    ctypes.byref(enabled),
+                    ctypes.sizeof(enabled),
+                )
+
+            # Windows 11: forzar color de barra para que no quede blanca en algunos temas.
+            if self.theme_name == "dark":
+                caption_color = ctypes.c_int(0x001B1B1B)  # COLORREF BGR
+                text_color = ctypes.c_int(0x00F0F0F0)
+            else:
+                caption_color = ctypes.c_int(0x00F2F2F2)
+                text_color = ctypes.c_int(0x00151515)
+
+            # 35: DWMWA_CAPTION_COLOR, 36: DWMWA_TEXT_COLOR
+            set_attr(root_hwnd, ctypes.c_uint(35), ctypes.byref(caption_color), ctypes.sizeof(caption_color))
+            set_attr(root_hwnd, ctypes.c_uint(36), ctypes.byref(text_color), ctypes.sizeof(text_color))
+
+            # Fuerza repintado no intrusivo de marco
+            user32.SetWindowPos(
+                root_hwnd,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0x0001 | 0x0002 | 0x0020 | 0x0400,  # NOSIZE|NOMOVE|FRAMECHANGED|NOOWNERZORDER
+            )
+        except Exception:
+            # Si falla, continuamos sin romper la app ni la UI existente.
+            return
+
+    def _set_style(self, theme_name: str) -> None:
+        style = ttk.Style(self)
+        try:
+            style.theme_use("clam")
+        except tk.TclError:
+            pass
+
+        self.theme_name = theme_name
+        self.colors = THEMES[theme_name]
+        self.configure(bg=self.colors["window_bg"])
+
+        bg = self.colors["bg"]
+        card_bg = self.colors["card_bg"]
+        text = self.colors["text"]
+        muted = self.colors["muted"]
+        primary = self.colors["primary"]
+        primary_hover = self.colors["primary_hover"]
+        danger = self.colors["danger"]
+        danger_hover = self.colors["danger_hover"]
+
+        style.configure("TFrame", background=bg)
+        style.configure("TLabel", background=bg, foreground=text)
+        style.configure(
+            "TLabelframe",
+            background=card_bg,
+            bordercolor=self.colors["card_border"],
+            lightcolor=self.colors["card_border"],
+            darkcolor=self.colors["card_border"],
+            relief="solid",
+            borderwidth=1,
+        )
+        style.configure("TLabelframe.Label", background=card_bg, foreground=text)
+        style.configure("TCheckbutton", background=bg, foreground=text)
+        style.map("TCheckbutton", background=[("active", bg)], foreground=[("disabled", muted)])
+        style.configure("App.TCheckbutton", background=bg, foreground=text, indicatorcolor=self.colors["input_border"])
+        style.map("App.TCheckbutton", background=[("active", bg)], foreground=[("disabled", muted)])
+        style.configure("TRadiobutton", background=bg, foreground=text)
+
+        style.configure("Root.TFrame", background=bg)
+        style.configure(
+            "Card.TLabelframe",
+            background=card_bg,
+            bordercolor=self.colors["card_border"],
+            lightcolor=self.colors["card_border"],
+            darkcolor=self.colors["card_border"],
+            relief="solid",
+            borderwidth=1,
+        )
+        style.configure("Card.TLabelframe.Label", background=card_bg, foreground=text, font=("Segoe UI", 10, "bold"))
+        style.configure("Header.TLabel", background=bg, foreground=text, font=("Segoe UI", 20, "bold"))
+        style.configure("SubHeader.TLabel", background=bg, foreground=muted, font=("Segoe UI", 10))
+        style.configure("MetricValue.TLabel", background=card_bg, foreground=text, font=("Segoe UI", 18, "bold"))
+
+        style.configure(
+            "Accent.TButton",
+            font=("Segoe UI", 10, "bold"),
+            padding=(12, 8),
+            foreground="#FFFFFF",
+            background=primary,
+            borderwidth=1,
+            bordercolor=self.colors["card_border"],
+            lightcolor=self.colors["card_border"],
+            darkcolor=self.colors["card_border"],
+            relief="solid",
+        )
+        style.map("Accent.TButton", background=[("active", primary_hover), ("pressed", primary_hover)])
+        style.configure(
+            "Secondary.TButton",
+            font=("Segoe UI", 10),
+            padding=(12, 8),
+            background=self.colors["secondary_bg"],
+            foreground=self.colors["secondary_text"],
+            borderwidth=1,
+            bordercolor=self.colors["card_border"],
+            lightcolor=self.colors["card_border"],
+            darkcolor=self.colors["card_border"],
+            relief="solid",
+        )
+        style.map("Secondary.TButton", background=[("active", self.colors["secondary_hover"])])
+        style.configure(
+            "Danger.TButton",
+            font=("Segoe UI", 10, "bold"),
+            padding=(12, 8),
+            background=danger,
+            foreground="#FFFFFF",
+            borderwidth=1,
+            bordercolor=self.colors["card_border"],
+            lightcolor=self.colors["card_border"],
+            darkcolor=self.colors["card_border"],
+            relief="solid",
+        )
+        style.map("Danger.TButton", background=[("active", danger_hover)])
+
+        style.configure(
+            "Modern.TNotebook",
+            background=bg,
+            borderwidth=1,
+            bordercolor=self.colors["card_border"],
+            lightcolor=self.colors["card_border"],
+            darkcolor=self.colors["card_border"],
+            relief="solid",
+        )
+        style.configure(
+            "Modern.TNotebook.Tab",
+            font=("Segoe UI", 10, "bold"),
+            padding=(16, 10),
+            background=self.colors["tab_bg"],
+            foreground=self.colors["tab_text"],
+            bordercolor=self.colors["card_border"],
+            lightcolor=self.colors["card_border"],
+            darkcolor=self.colors["card_border"],
+            focuscolor=self.colors["tab_bg"],
+            relief="flat",
+        )
+        style.map(
+            "Modern.TNotebook.Tab",
+            background=[("selected", self.colors["tab_selected"]), ("active", self.colors["tab_hover"])],
+            foreground=[("selected", text)],
+            bordercolor=[("selected", self.colors["card_border"]), ("active", self.colors["card_border"])],
+            lightcolor=[("selected", self.colors["card_border"]), ("active", self.colors["card_border"])],
+            darkcolor=[("selected", self.colors["card_border"]), ("active", self.colors["card_border"])],
+        )
+
+        style.configure(
+            "Modern.Treeview",
+            rowheight=30,
+            font=("Segoe UI", 10),
+            fieldbackground=self.colors["tree_bg"],
+            background=self.colors["tree_bg"],
+            foreground=text,
+            borderwidth=1,
+            relief="solid",
+            bordercolor=self.colors["tree_border"],
+            lightcolor=self.colors["tree_border"],
+            darkcolor=self.colors["tree_border"],
+        )
+        style.configure(
+            "Modern.Treeview.Heading",
+            font=("Segoe UI", 10, "bold"),
+            background=self.colors["tree_heading_bg"],
+            foreground=self.colors["tree_heading_text"],
+            relief="flat",
+            borderwidth=1,
+            bordercolor=self.colors["tree_border"],
+            lightcolor=self.colors["tree_border"],
+            darkcolor=self.colors["tree_border"],
+        )
+        style.map(
+            "Modern.Treeview.Heading",
+            background=[("active", self.colors["tree_heading_bg"])],
+            bordercolor=[("active", self.colors["tree_border"])],
+            lightcolor=[("active", self.colors["tree_border"])],
+            darkcolor=[("active", self.colors["tree_border"])],
+        )
+        style.map("Modern.Treeview", background=[("selected", self.colors["tree_selected"])], foreground=[("selected", text)])
+
+        # Estado de recurrencias más visible (activa/pausada)
+        style.configure("RecurrenceActive.Treeview", foreground=text)
+        style.configure("RecurrencePaused.Treeview", foreground=self.colors["muted"])
+
+        style.configure(
+            "TEntry",
+            padding=6,
+            fieldbackground=self.colors["input_bg"],
+            foreground=self.colors["input_fg"],
+            insertcolor=self.colors["input_fg"],
+            bordercolor=self.colors["input_border"],
+            darkcolor=self.colors["input_border"],
+            lightcolor=self.colors["input_border"],
+        )
+        style.configure(
+            "TCombobox",
+            padding=4,
+            fieldbackground=self.colors["input_bg"],
+            foreground=self.colors["input_fg"],
+            background=self.colors["combo_arrow_bg"],
+            bordercolor=self.colors["input_border"],
+            darkcolor=self.colors["input_border"],
+            lightcolor=self.colors["input_border"],
+            arrowcolor=self.colors["text"],
+            arrowsize=13,
+        )
+        style.map(
+            "TCombobox",
+            fieldbackground=[("readonly", self.colors["input_readonly_bg"]), ("!readonly", self.colors["input_bg"])],
+            foreground=[("readonly", self.colors["input_fg"]), ("!readonly", self.colors["input_fg"])],
+            background=[("readonly", self.colors["combo_arrow_bg"]), ("active", self.colors["combo_arrow_active_bg"])],
+            selectbackground=[("readonly", self.colors["input_readonly_bg"])],
+            selectforeground=[("readonly", self.colors["input_fg"])],
+            arrowcolor=[("readonly", self.colors["text"]), ("active", self.colors["text"])],
+        )
+
+        if hasattr(self, "chart_canvas"):
+            self.chart_canvas.configure(bg=self.colors["chart_bg"])
+        if hasattr(self, "invest_chart"):
+            self.invest_chart.configure(bg=self.colors["chart_bg"])
+
+        self._schedule_titlebar_theme_sync()
+
+    def _build_ui(self) -> None:
+        root = ttk.Frame(self, padding=12, style="Root.TFrame")
+        root.pack(fill="both", expand=True)
+
+        ttk.Label(root, text="Panel financiero personal", style="Header.TLabel").pack(anchor="w")
+        self.available_var = tk.StringVar(value="Disponible: 0,00 €")
+        ttk.Label(root, textvariable=self.available_var, style="SubHeader.TLabel").pack(anchor="w", pady=(0, 8))
+
+        filters = ttk.Frame(root, style="Root.TFrame")
+        filters.pack(fill="x", pady=(0, 8))
+
+        ttk.Label(filters, text="Año", style="SubHeader.TLabel").pack(side="left")
+        self.year_var = tk.StringVar(value=str(date.today().year))
+        self.year_combo = ttk.Combobox(filters, textvariable=self.year_var, state="readonly", width=8)
+        self.year_combo.pack(side="left", padx=(6, 12))
+
+        ttk.Label(filters, text="Mes", style="SubHeader.TLabel").pack(side="left")
+        self.month_var = tk.StringVar(value=f"{date.today().month:02d} - {MONTH_NAMES[date.today().month]}")
+        self.month_combo = ttk.Combobox(
+            filters,
+            textvariable=self.month_var,
+            state="readonly",
+            width=13,
+            values=[f"{m:02d} - {MONTH_NAMES[m]}" for m in range(1, 13)],
+        )
+        self.month_combo.pack(side="left", padx=(6, 12))
+
+        ttk.Button(filters, text="Aplicar periodo", command=self.refresh_all, style="Accent.TButton").pack(side="left")
+        ttk.Button(filters, text="Aplicar recurrencias ahora", command=self.apply_recurrences_now, style="Secondary.TButton").pack(side="left", padx=(8, 0))
+        self.theme_toggle_btn = ttk.Button(
+            filters,
+            text="🌙 Modo oscuro",
+            command=self.toggle_theme,
+            style="Secondary.TButton",
+        )
+        self.theme_toggle_btn.pack(side="right", padx=(0, 8))
+        ttk.Button(
+            filters,
+            text="Resetear base de datos",
+            command=self.reset_database_with_confirmation,
+            style="Danger.TButton",
+        ).pack(side="right")
+
+        self.notebook = ttk.Notebook(root, style="Modern.TNotebook")
+        self.notebook.pack(fill="both", expand=True)
+
+        self.dashboard_tab = ttk.Frame(self.notebook, padding=10)
+        self.mov_tab = ttk.Frame(self.notebook, padding=10)
+        self.accounts_tab = ttk.Frame(self.notebook, padding=10)
+        self.investments_tab = ttk.Frame(self.notebook, padding=10)
+        self.recurrences_tab = ttk.Frame(self.notebook, padding=10)
+
+        self.notebook.add(self.dashboard_tab, text="Resumen")
+        self.notebook.add(self.mov_tab, text="Movimientos")
+        self.notebook.add(self.accounts_tab, text="Cuentas")
+        self.notebook.add(self.investments_tab, text="Inversiones")
+        self.notebook.add(self.recurrences_tab, text="Recurrencias")
+
+        self._build_dashboard_tab()
+        self._build_movimientos_tab()
+        self._build_accounts_tab()
+        self._build_investments_tab()
+        self._build_recurrences_tab()
+
+    def _build_dashboard_tab(self) -> None:
+        cards = ttk.Frame(self.dashboard_tab)
+        cards.pack(fill="x")
+
+        self.metric_balance = tk.StringVar(value="0,00 €")
+        self.metric_income = tk.StringVar(value="0,00 €")
+        self.metric_expenses = tk.StringVar(value="0,00 €")
+        self.metric_saving_rate = tk.StringVar(value="0 %")
+        self.metric_accounts = tk.StringVar(value="0,00 €")
+        self.metric_invested = tk.StringVar(value="0,00 €")
+
+        card_data = [
+            ("Balance periodo", self.metric_balance),
+            ("Ingresos", self.metric_income),
+            ("Gastos", self.metric_expenses),
+            ("Tasa ahorro", self.metric_saving_rate),
+            ("Saldo cuentas", self.metric_accounts),
+            ("Valor cartera", self.metric_invested),
+        ]
+
+        for idx, (title, var) in enumerate(card_data):
+            frame = ttk.LabelFrame(cards, text=f" {title} ", style="Card.TLabelframe")
+            frame.grid(row=0, column=idx, padx=4, sticky="nsew")
+            ttk.Label(frame, textvariable=var, style="MetricValue.TLabel").pack(padx=10, pady=12)
+            cards.columnconfigure(idx, weight=1)
+
+        graph_frame = ttk.LabelFrame(self.dashboard_tab, text=" Evolución 6 meses ", style="Card.TLabelframe")
+        graph_frame.pack(fill="both", expand=True, pady=(10, 0))
+        self.chart_canvas = tk.Canvas(graph_frame, bg=self.colors["chart_bg"], height=260, highlightthickness=0)
+        self.chart_canvas.pack(fill="both", expand=True, padx=8, pady=8)
+        self._chart_redraw_job: str | None = None
+        self.chart_canvas.bind("<Configure>", self.on_chart_canvas_resize)
+
+    def on_chart_canvas_resize(self, _event: tk.Event) -> None:
+        """Redibuja la gráfica cuando el canvas termina de ajustarse al layout."""
+        if self._chart_redraw_job is not None:
+            self.after_cancel(self._chart_redraw_job)
+        self._chart_redraw_job = self.after(60, self.draw_monthly_chart)
+
+    def _build_movimientos_tab(self) -> None:
+        top = ttk.LabelFrame(self.mov_tab, text=" Nuevo movimiento ", style="Card.TLabelframe", padding=10)
+        top.pack(fill="x")
+        top.columnconfigure(3, weight=1)
+
+        self.mov_tipo = tk.StringVar(value="gasto")
+        self.mov_monto = tk.StringVar()
+        self.mov_categoria = tk.StringVar()
+        self.mov_descripcion = tk.StringVar()
+        self.mov_fecha = tk.StringVar(value=date.today().isoformat())
+        self.mov_cuenta = tk.StringVar(value="Sin cuenta")
+        self.mov_recurrente = tk.BooleanVar(value=False)
+
+        ttk.Label(top, text="Tipo").grid(row=0, column=0, sticky="w", padx=(0, 10))
+        ttk.Combobox(top, textvariable=self.mov_tipo, values=["ingreso", "gasto"], state="readonly", width=12).grid(
+            row=1, column=0, sticky="w", padx=(0, 10), pady=(2, 0)
+        )
+
+        ttk.Label(top, text="Monto").grid(row=0, column=1, sticky="w", padx=(0, 10))
+        ttk.Entry(top, textvariable=self.mov_monto, width=12).grid(row=1, column=1, sticky="w", padx=(0, 10), pady=(2, 0))
+
+        ttk.Label(top, text="Categoría").grid(row=0, column=2, sticky="w", padx=(0, 10))
+        ttk.Entry(top, textvariable=self.mov_categoria, width=16).grid(row=1, column=2, sticky="w", padx=(0, 10), pady=(2, 0))
+
+        ttk.Label(top, text="Cuenta").grid(row=0, column=3, sticky="w", padx=(0, 10))
+        self.mov_account_combo = ttk.Combobox(top, textvariable=self.mov_cuenta, state="readonly", width=22)
+        self.mov_account_combo.grid(row=1, column=3, sticky="we", padx=(0, 10), pady=(2, 0))
+
+        ttk.Label(top, text="Fecha").grid(row=0, column=4, sticky="w", padx=(0, 10))
+        ttk.Entry(top, textvariable=self.mov_fecha, width=12).grid(row=1, column=4, sticky="w", padx=(0, 10), pady=(2, 0))
+
+        ttk.Label(top, text="Descripción").grid(row=2, column=0, sticky="w", pady=(8, 0))
+        ttk.Entry(top, textvariable=self.mov_descripcion, width=60).grid(row=3, column=0, columnspan=4, sticky="we", padx=(0, 10), pady=(2, 0))
+        ttk.Checkbutton(top, text="Recurrente mensual", variable=self.mov_recurrente, style="App.TCheckbutton").grid(row=3, column=4, sticky="w", padx=(0, 10), pady=(2, 0))
+        ttk.Button(top, text="Guardar movimiento", command=self.add_movimiento, style="Accent.TButton").grid(row=3, column=5, padx=(8, 0))
+
+        table_frame = ttk.LabelFrame(self.mov_tab, text=" Movimientos del periodo ", style="Card.TLabelframe", padding=8)
+        table_frame.pack(fill="both", expand=True, pady=(10, 0))
+
+        cols = ("id", "fecha", "tipo", "categoria", "cuenta", "monto", "descripcion")
+        self.mov_tree = ttk.Treeview(table_frame, columns=cols, show="headings", style="Modern.Treeview")
+        widths = {"id": 50, "fecha": 100, "tipo": 80, "categoria": 120, "cuenta": 170, "monto": 110, "descripcion": 360}
+        headers = {
+            "id": "ID",
+            "fecha": "Fecha",
+            "tipo": "Tipo",
+            "categoria": "Categoría",
+            "cuenta": "Cuenta",
+            "monto": "Monto",
+            "descripcion": "Descripción",
+        }
+
+        for col in cols:
+            anchor = "e" if col == "monto" else "w"
+            self.mov_tree.heading(col, text=headers[col], anchor=anchor)
+            self.mov_tree.column(col, width=widths[col], anchor=anchor)
+
+        scr = ttk.Scrollbar(table_frame, orient="vertical", command=self.mov_tree.yview)
+        self.mov_tree.configure(yscrollcommand=scr.set)
+        self.mov_tree.pack(side="left", fill="both", expand=True)
+        scr.pack(side="right", fill="y")
+
+        actions = ttk.Frame(self.mov_tab)
+        actions.pack(fill="x", pady=(8, 0))
+        ttk.Button(actions, text="Eliminar seleccionada", command=self.delete_movimiento, style="Secondary.TButton").pack(side="left")
+        ttk.Button(actions, text="Exportar CSV", command=self.export_movimientos_csv, style="Secondary.TButton").pack(side="left", padx=(8, 0))
+
+    def _build_accounts_tab(self) -> None:
+        form = ttk.LabelFrame(self.accounts_tab, text=" Nueva cuenta bancaria ", style="Card.TLabelframe", padding=10)
+        form.pack(fill="x")
+
+        self.acc_nombre = tk.StringVar()
+        self.acc_banco = tk.StringVar()
+        self.acc_tipo = tk.StringVar(value="Corriente")
+        self.acc_moneda = tk.StringVar(value="EUR")
+        self.acc_saldo = tk.StringVar(value="0")
+
+        ttk.Label(form, text="Nombre").grid(row=0, column=0, sticky="w")
+        ttk.Entry(form, textvariable=self.acc_nombre, width=20).grid(row=1, column=0)
+        ttk.Label(form, text="Banco").grid(row=0, column=1, sticky="w")
+        ttk.Entry(form, textvariable=self.acc_banco, width=20).grid(row=1, column=1)
+        ttk.Label(form, text="Tipo").grid(row=0, column=2, sticky="w")
+        ttk.Combobox(form, textvariable=self.acc_tipo, values=["Corriente", "Ahorro", "Nómina", "Broker", "Otra"], state="readonly", width=14).grid(row=1, column=2)
+        ttk.Label(form, text="Moneda").grid(row=0, column=3, sticky="w")
+        ttk.Combobox(form, textvariable=self.acc_moneda, values=["EUR", "USD", "GBP"], state="readonly", width=8).grid(row=1, column=3)
+        ttk.Label(form, text="Saldo").grid(row=0, column=4, sticky="w")
+        ttk.Entry(form, textvariable=self.acc_saldo, width=12).grid(row=1, column=4)
+        ttk.Button(form, text="Guardar cuenta", command=self.add_account, style="Accent.TButton").grid(row=1, column=5, padx=(8, 0))
+
+        self.accounts_total_var = tk.StringVar(value="Saldo agregado: 0,00 €")
+        ttk.Label(self.accounts_tab, textvariable=self.accounts_total_var, style="Header.TLabel").pack(anchor="w", pady=(8, 6))
+
+        table = ttk.LabelFrame(self.accounts_tab, text=" Cuentas registradas ", style="Card.TLabelframe", padding=8)
+        table.pack(fill="both", expand=True)
+
+        cols = ("id", "nombre", "banco", "tipo", "moneda", "saldo")
+        self.accounts_tree = ttk.Treeview(table, columns=cols, show="headings", style="Modern.Treeview")
+        for c, t, w in [("id", "ID", 50), ("nombre", "Nombre", 190), ("banco", "Banco", 170), ("tipo", "Tipo", 120), ("moneda", "Moneda", 90), ("saldo", "Saldo", 130)]:
+            anchor = "e" if c == "saldo" else "w"
+            self.accounts_tree.heading(c, text=t, anchor=anchor)
+            self.accounts_tree.column(c, width=w, anchor=anchor)
+
+        scr = ttk.Scrollbar(table, orient="vertical", command=self.accounts_tree.yview)
+        self.accounts_tree.configure(yscrollcommand=scr.set)
+        self.accounts_tree.pack(side="left", fill="both", expand=True)
+        scr.pack(side="right", fill="y")
+
+        actions = ttk.Frame(self.accounts_tab)
+        actions.pack(fill="x", pady=(8, 0))
+        ttk.Button(actions, text="Editar cuenta", command=self.edit_account, style="Secondary.TButton").pack(side="left")
+        ttk.Button(actions, text="Eliminar cuenta", command=self.delete_account, style="Secondary.TButton").pack(side="left", padx=(8, 0))
+
+    def _build_investments_tab(self) -> None:
+        form = ttk.LabelFrame(self.investments_tab, text=" Nueva inversión / aporte ", style="Card.TLabelframe", padding=10)
+        form.pack(fill="x")
+        for col in range(0, 9):
+            form.columnconfigure(col, weight=1 if col in {0, 2, 5} else 0)
+
+        self.inv_nombre = tk.StringVar()
+        self.inv_tipo = tk.StringVar(value="Acción")
+        self.inv_broker = tk.StringVar()
+        self.inv_invertido = tk.StringVar()
+        self.inv_riesgo = tk.StringVar(value="Medio")
+        self.inv_fecha = tk.StringVar(value=date.today().isoformat())
+        self.inv_cuenta = tk.StringVar(value="Sin cuenta")
+        self.inv_recurrente = tk.BooleanVar(value=False)
+
+        ttk.Label(form, text="Activo").grid(row=0, column=0, sticky="w", padx=(0, 10))
+        ttk.Entry(form, textvariable=self.inv_nombre, width=18).grid(row=1, column=0, sticky="we", padx=(0, 10), pady=(2, 0))
+        ttk.Label(form, text="Tipo").grid(row=0, column=1, sticky="w", padx=(0, 10))
+        ttk.Combobox(
+            form,
+            textvariable=self.inv_tipo,
+            values=["Acción", "ETF", "Fondo", "Cripto", "Renta fija", "Otro"],
+            state="readonly",
+            width=12,
+        ).grid(row=1, column=1, sticky="w", padx=(0, 10), pady=(2, 0))
+        ttk.Label(form, text="Broker").grid(row=0, column=2, sticky="w", padx=(0, 10))
+        ttk.Entry(form, textvariable=self.inv_broker, width=16).grid(row=1, column=2, sticky="we", padx=(0, 10), pady=(2, 0))
+        ttk.Label(form, text="Aporte inicial (€)").grid(row=0, column=3, sticky="w", padx=(0, 10))
+        ttk.Entry(form, textvariable=self.inv_invertido, width=12).grid(row=1, column=3, sticky="w", padx=(0, 10), pady=(2, 0))
+        ttk.Label(form, text="Cuenta origen").grid(row=0, column=5, sticky="w", padx=(0, 10))
+        self.inv_account_combo = ttk.Combobox(form, textvariable=self.inv_cuenta, state="readonly", width=18)
+        self.inv_account_combo.grid(row=1, column=5, sticky="we", padx=(0, 10), pady=(2, 0))
+        ttk.Label(form, text="Riesgo").grid(row=0, column=6, sticky="w", padx=(0, 10))
+        ttk.Combobox(form, textvariable=self.inv_riesgo, values=["Bajo", "Medio", "Alto"], state="readonly", width=10).grid(
+            row=1, column=6, sticky="w", padx=(0, 10), pady=(2, 0)
+        )
+        ttk.Checkbutton(form, text="Recurrente mensual", variable=self.inv_recurrente, style="App.TCheckbutton").grid(row=1, column=7, padx=(8, 10), sticky="w", pady=(2, 0))
+        ttk.Label(
+            form,
+            text="(El valor actual se actualiza después desde 'Actualizar valor actual')",
+            style="SubHeader.TLabel",
+        ).grid(row=2, column=0, columnspan=7, sticky="w", pady=(8, 0))
+        ttk.Button(form, text="Guardar inversión", command=self.add_investment, style="Accent.TButton").grid(row=1, column=8, padx=(8, 0), pady=(2, 0))
+
+        self.inv_summary_var = tk.StringVar(value="Invertido: 0,00 € | Valor actual: 0,00 € | Rentabilidad: 0,00 €")
+        ttk.Label(self.investments_tab, textvariable=self.inv_summary_var, style="Header.TLabel").pack(anchor="w", pady=(8, 6))
+
+        chart_box = ttk.LabelFrame(self.investments_tab, text=" Composición de cartera ", style="Card.TLabelframe", padding=8)
+        chart_box.pack(fill="x")
+        self.invest_chart = tk.Canvas(chart_box, bg=self.colors["chart_bg"], height=150, highlightthickness=0)
+        self.invest_chart.pack(fill="x")
+
+        table = ttk.LabelFrame(self.investments_tab, text=" Posiciones agregadas ", style="Card.TLabelframe", padding=8)
+        table.pack(fill="both", expand=True, pady=(10, 0))
+
+        cols = ("id", "nombre", "tipo", "broker", "invertido", "actual", "riesgo", "rent")
+        self.inv_tree = ttk.Treeview(table, columns=cols, show="headings", style="Modern.Treeview")
+        for c, t, w in [
+            ("id", "ID", 50),
+            ("nombre", "Activo", 170),
+            ("tipo", "Tipo", 90),
+            ("broker", "Broker", 110),
+            ("invertido", "Invertido", 120),
+            ("actual", "Actual", 120),
+            ("riesgo", "Riesgo", 90),
+            ("rent", "P/L", 110),
+        ]:
+            anchor = "e" if c in {"invertido", "actual", "rent"} else "w"
+            self.inv_tree.heading(c, text=t, anchor=anchor)
+            self.inv_tree.column(c, width=w, anchor=anchor)
+
+        scr = ttk.Scrollbar(table, orient="vertical", command=self.inv_tree.yview)
+        self.inv_tree.configure(yscrollcommand=scr.set)
+        self.inv_tree.pack(side="left", fill="both", expand=True)
+        scr.pack(side="right", fill="y")
+        self.inv_tree.bind("<Double-1>", lambda _event: self.quick_update_investment_value())
+
+        actions = ttk.Frame(self.investments_tab)
+        actions.pack(fill="x", pady=(8, 0))
+        ttk.Button(actions, text="Editar posición", command=self.edit_investment, style="Secondary.TButton").pack(side="left")
+        ttk.Button(actions, text="Actualizar valor actual", command=self.quick_update_investment_value, style="Secondary.TButton").pack(side="left", padx=(8, 0))
+        ttk.Button(actions, text="Eliminar posición", command=self.delete_investment, style="Secondary.TButton").pack(side="left", padx=(8, 0))
+
+    def _build_recurrences_tab(self) -> None:
+        info = ttk.Label(self.recurrences_tab, text="Puedes activar/desactivar reglas recurrentes mensuales de gastos e inversiones.")
+        info.pack(anchor="w", pady=(0, 8))
+
+        table = ttk.LabelFrame(self.recurrences_tab, text=" Reglas recurrentes ", style="Card.TLabelframe", padding=8)
+        table.pack(fill="both", expand=True)
+
+        cols = ("id", "tipo", "nombre", "categoria", "monto", "cuenta", "estado", "ultimo")
+        self.rec_tree = ttk.Treeview(table, columns=cols, show="headings", style="Modern.Treeview")
+        for c, t, w in [
+            ("id", "ID", 50),
+            ("tipo", "Tipo", 90),
+            ("nombre", "Nombre", 190),
+            ("categoria", "Categoría/Tipo", 140),
+            ("monto", "Monto", 110),
+            ("cuenta", "Cuenta", 180),
+            ("estado", "Estado", 80),
+            ("ultimo", "Último mes", 110),
+        ]:
+            anchor = "e" if c == "monto" else "w"
+            self.rec_tree.heading(c, text=t, anchor=anchor)
+            self.rec_tree.column(c, width=w, anchor=anchor)
+
+        scr = ttk.Scrollbar(table, orient="vertical", command=self.rec_tree.yview)
+        self.rec_tree.configure(yscrollcommand=scr.set)
+        self.rec_tree.pack(side="left", fill="both", expand=True)
+        scr.pack(side="right", fill="y")
+
+        actions = ttk.Frame(self.recurrences_tab)
+        actions.pack(fill="x", pady=(8, 0))
+        ttk.Button(actions, text="Activar/Desactivar", command=self.toggle_recurrence, style="Secondary.TButton").pack(side="left")
+        ttk.Button(actions, text="Eliminar regla", command=self.delete_recurrence, style="Secondary.TButton").pack(side="left", padx=(8, 0))
+
+    def selected_year_month(self) -> tuple[int, int]:
+        try:
+            year = int(self.year_var.get().strip())
+        except ValueError:
+            year = date.today().year
+
+        month_txt = self.month_var.get().strip()
+        month = int(month_txt[:2]) if len(month_txt) >= 2 and month_txt[:2].isdigit() else date.today().month
+        return year, month
+
+    def refresh_period_options(self) -> None:
+        years = set(range(date.today().year, 2041))
+        rows = self.conn.execute("SELECT fecha FROM transacciones").fetchall()
+        for row in rows:
+            try:
+                years.add(parse_iso_date(row["fecha"]).year)
+            except ValueError:
+                continue
+
+        values = [str(y) for y in sorted(years)]
+        self.year_combo["values"] = values
+        if self.year_var.get() not in values:
+            self.year_var.set(values[-1])
+
+    def refresh_accounts_combo(self) -> None:
+        rows = self.conn.execute("SELECT id, nombre, banco FROM cuentas ORDER BY nombre").fetchall()
+        self.account_map = {"Sin cuenta": None}
+        opts = ["Sin cuenta"]
+        for row in rows:
+            label = f"{row['nombre']} ({row['banco']})"
+            self.account_map[label] = row["id"]
+            opts.append(label)
+        self.mov_account_combo["values"] = opts
+        self.inv_account_combo["values"] = opts
+        if self.mov_cuenta.get() not in opts:
+            self.mov_cuenta.set("Sin cuenta")
+        if self.inv_cuenta.get() not in opts:
+            self.inv_cuenta.set("Sin cuenta")
+
+    def get_filtered_movimientos(self) -> list[sqlite3.Row]:
+        year, month = self.selected_year_month()
+        start = f"{year:04d}-{month:02d}-01"
+        end_y, end_m = month_add(year, month, 1)
+        end = f"{end_y:04d}-{end_m:02d}-01"
+
+        return self.conn.execute(
+            """
+            SELECT t.id, t.fecha, t.tipo, t.categoria, t.descripcion, t.monto, c.nombre AS cuenta_nombre
+            FROM transacciones t
+            LEFT JOIN cuentas c ON c.id = t.cuenta_id
+            WHERE t.fecha >= ? AND t.fecha < ?
+            ORDER BY t.fecha DESC, t.id DESC
+            """,
+            (start, end),
+        ).fetchall()
+
+    def refresh_movimientos(self) -> None:
+        for item in self.mov_tree.get_children():
+            self.mov_tree.delete(item)
+
+        for row in self.get_filtered_movimientos():
+            self.mov_tree.insert(
+                "",
+                "end",
+                values=(
+                    row["id"],
+                    row["fecha"],
+                    row["tipo"],
+                    row["categoria"],
+                    row["cuenta_nombre"] or "-",
+                    formato_eur(row["monto"]),
+                    row["descripcion"],
+                ),
+            )
+
+    def refresh_dashboard(self) -> None:
+        rows = self.get_filtered_movimientos()
+        ingresos = sum(r["monto"] for r in rows if r["tipo"] == "ingreso")
+        gastos = sum(r["monto"] for r in rows if r["tipo"] == "gasto")
+        balance = ingresos - gastos
+        tasa = (balance / ingresos * 100) if ingresos else 0
+
+        cuentas_total = self.conn.execute("SELECT COALESCE(SUM(saldo), 0) FROM cuentas").fetchone()[0]
+        cartera = self.conn.execute("SELECT COALESCE(SUM(valor_actual), 0) FROM inversiones").fetchone()[0]
+
+        self.metric_balance.set(formato_eur(balance))
+        self.metric_income.set(formato_eur(ingresos))
+        self.metric_expenses.set(formato_eur(gastos))
+        self.metric_saving_rate.set(f"{tasa:.1f}%")
+        self.metric_accounts.set(formato_eur(cuentas_total))
+        self.metric_invested.set(formato_eur(cartera))
+        self.available_var.set(f"Disponible (sin crédito): {formato_eur(get_available_cash(self.conn))}")
+
+        self.draw_monthly_chart()
+
+    def draw_monthly_chart(self) -> None:
+        self.chart_canvas.delete("all")
+        width = max(640, self.chart_canvas.winfo_width())
+        height = max(220, self.chart_canvas.winfo_height())
+        pad = 40
+
+        today = date.today()
+        months = []
+        y, m = today.year, today.month
+        for _ in range(6):
+            months.append((y, m))
+            y, m = month_add(y, m, -1)
+        months.reverse()
+
+        max_value = 1.0
+        series = []
+        for y, m in months:
+            start = f"{y:04d}-{m:02d}-01"
+            ey, em = month_add(y, m, 1)
+            end = f"{ey:04d}-{em:02d}-01"
+            inc = self.conn.execute(
+                "SELECT COALESCE(SUM(monto),0) FROM transacciones WHERE tipo='ingreso' AND fecha>=? AND fecha<?",
+                (start, end),
+            ).fetchone()[0]
+            exp = self.conn.execute(
+                "SELECT COALESCE(SUM(monto),0) FROM transacciones WHERE tipo='gasto' AND fecha>=? AND fecha<?",
+                (start, end),
+            ).fetchone()[0]
+            series.append((m, inc, exp))
+            max_value = max(max_value, inc, exp)
+
+        base_y = height - 24
+        chart_w = width - (pad * 2)
+        group_w = chart_w / len(series)
+        bar_w = group_w * 0.32
+        max_h = height - 70
+
+        self.chart_canvas.create_line(pad, base_y, width - pad, base_y, fill=self.colors["chart_axis"])
+        self.chart_canvas.create_text(
+            pad,
+            14,
+            text="Ingresos vs gastos (6 meses)",
+            anchor="w",
+            fill=self.colors["chart_title"],
+            font=("Segoe UI", 11, "bold"),
+        )
+
+        for idx, (m, inc, exp) in enumerate(series):
+            center = pad + (idx + 0.5) * group_w
+            h_inc = (inc / max_value) * max_h
+            h_exp = (exp / max_value) * max_h
+            self.chart_canvas.create_rectangle(center - bar_w - 2, base_y - h_inc, center - 2, base_y, fill="#1E9E68", outline="")
+            self.chart_canvas.create_rectangle(center + 2, base_y - h_exp, center + bar_w + 2, base_y, fill="#D14A5B", outline="")
+            self.chart_canvas.create_text(center, base_y + 12, text=MONTH_NAMES[m][:3], fill=self.colors["chart_label"])
+
+    def refresh_accounts(self) -> None:
+        for item in self.accounts_tree.get_children():
+            self.accounts_tree.delete(item)
+
+        total = 0.0
+        rows = self.conn.execute("SELECT id, nombre, banco, tipo, moneda, saldo FROM cuentas ORDER BY banco, nombre").fetchall()
+        for row in rows:
+            total += row["saldo"]
+            self.accounts_tree.insert("", "end", values=(row["id"], row["nombre"], row["banco"], row["tipo"], row["moneda"], formato_eur(row["saldo"])))
+        self.accounts_total_var.set(f"Saldo agregado: {formato_eur(total)}")
+
+    def refresh_investments(self) -> None:
+        for item in self.inv_tree.get_children():
+            self.inv_tree.delete(item)
+
+        rows = self.conn.execute(
+            "SELECT id, nombre, tipo, broker, monto_invertido, valor_actual, riesgo FROM inversiones ORDER BY nombre"
+        ).fetchall()
+        total_inv = 0.0
+        total_current = 0.0
+        by_type: dict[str, float] = {}
+
+        for row in rows:
+            pnl = row["valor_actual"] - row["monto_invertido"]
+            total_inv += row["monto_invertido"]
+            total_current += row["valor_actual"]
+            by_type[row["tipo"]] = by_type.get(row["tipo"], 0.0) + row["valor_actual"]
+            self.inv_tree.insert(
+                "",
+                "end",
+                values=(
+                    row["id"],
+                    row["nombre"],
+                    row["tipo"],
+                    row["broker"] or "-",
+                    formato_eur(row["monto_invertido"]),
+                    formato_eur(row["valor_actual"]),
+                    row["riesgo"],
+                    formato_eur(pnl),
+                ),
+            )
+
+        self.inv_summary_var.set(
+            f"Invertido: {formato_eur(total_inv)} | Valor actual: {formato_eur(total_current)} | Rentabilidad: {formato_eur(total_current - total_inv)}"
+        )
+        self.draw_investments_chart(by_type)
+
+    def draw_investments_chart(self, by_type: dict[str, float]) -> None:
+        self.invest_chart.delete("all")
+        w = max(600, self.invest_chart.winfo_width())
+        total = sum(by_type.values())
+        if total <= 0:
+            self.invest_chart.create_text(w / 2, 70, text="Sin datos de inversiones", fill=self.colors["empty_text"])
+            return
+
+        colors = ["#2C7BE5", "#00A5A8", "#F29E4C", "#A66CFF", "#E05263", "#48BB78"]
+        x = 16
+        usable = w - 32
+        for idx, (name, value) in enumerate(sorted(by_type.items(), key=lambda kv: kv[1], reverse=True)):
+            seg = usable * (value / total)
+            color = colors[idx % len(colors)]
+            self.invest_chart.create_rectangle(x, 28, x + seg, 68, fill=color, outline="")
+            self.invest_chart.create_text(
+                x + 4,
+                76,
+                text=f"{name} ({value / total * 100:.0f}%)",
+                anchor="nw",
+                fill=self.colors["invest_label"],
+            )
+            x += seg
+
+    def toggle_theme(self) -> None:
+        next_theme = "dark" if self.theme_name == "light" else "light"
+        self.dark_mode_var.set(next_theme == "dark")
+        self._set_style(next_theme)
+        self._schedule_titlebar_theme_sync()
+        set_config(self.conn, "theme", next_theme)
+        self._update_theme_button_text()
+        self.refresh_dashboard()
+        self.refresh_investments()
+
+    def _update_theme_button_text(self) -> None:
+        if hasattr(self, "theme_toggle_btn"):
+            self.theme_toggle_btn.configure(
+                text="☀️ Modo claro" if self.theme_name == "dark" else "🌙 Modo oscuro"
+            )
+
+    def refresh_recurrences(self) -> None:
+        for item in self.rec_tree.get_children():
+            self.rec_tree.delete(item)
+
+        rows = self.conn.execute(
+            """
+            SELECT r.*, c.nombre AS cuenta_nombre
+            FROM recurrencias r
+            LEFT JOIN cuentas c ON c.id = r.cuenta_id
+            ORDER BY r.id DESC
+            """
+        ).fetchall()
+
+        for row in rows:
+            ultimo = "-"
+            if row["ultimo_year"] and row["ultimo_month"]:
+                ultimo = f"{row['ultimo_year']}-{row['ultimo_month']:02d}"
+            estado_texto = "✅ Activa" if row["activa"] else "⏸ Pausada"
+            tag = "rec_active" if row["activa"] else "rec_paused"
+            self.rec_tree.insert(
+                "",
+                "end",
+                values=(
+                    row["id"],
+                    row["tipo"],
+                    row["nombre"],
+                    row["categoria_tipo"],
+                    formato_eur(row["monto"]),
+                    row["cuenta_nombre"] or "-",
+                    estado_texto,
+                    ultimo,
+                ),
+                tags=(tag,),
+            )
+
+        self.rec_tree.tag_configure("rec_active", foreground=self.colors["text"])
+        self.rec_tree.tag_configure("rec_paused", foreground=self.colors["muted"])
+
+    def refresh_all(self) -> None:
+        self.refresh_period_options()
+        self.refresh_accounts_combo()
+        self.refresh_movimientos()
+        self.refresh_accounts()
+        self.refresh_investments()
+        self.refresh_recurrences()
+        self.refresh_dashboard()
+
+    def add_movimiento(self) -> None:
+        tipo = self.mov_tipo.get().strip()
+        categoria = self.mov_categoria.get().strip()
+        descripcion = self.mov_descripcion.get().strip()
+        fecha_text = self.mov_fecha.get().strip()
+        cuenta_id = self.account_map.get(self.mov_cuenta.get())
+
+        try:
+            monto = float(self.mov_monto.get().strip())
+        except ValueError:
+            messagebox.showerror("Monto inválido", "Introduce un monto numérico")
+            return
+
+        if monto < 0:
+            messagebox.showerror("Monto inválido", "El monto no puede ser negativo")
+            return
+        if tipo not in {"ingreso", "gasto"}:
+            messagebox.showerror("Tipo inválido", "Selecciona ingreso o gasto")
+            return
+        if not categoria or not descripcion:
+            messagebox.showerror("Campos", "Categoría y descripción son obligatorias")
+            return
+
+        try:
+            parse_iso_date(fecha_text)
+        except ValueError:
+            messagebox.showerror("Fecha", "Usa formato YYYY-MM-DD")
+            return
+
+        if tipo == "gasto" and monto > get_available_cash(self.conn):
+            messagebox.showerror("Fondos insuficientes", "No hay dinero disponible para este gasto (sin crédito)")
+            return
+
+        self.conn.execute(
+            """
+            INSERT INTO transacciones (fecha, tipo, categoria, descripcion, monto, cuenta_id)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (fecha_text, tipo, categoria, descripcion, monto, cuenta_id),
+        )
+
+        if cuenta_id:
+            delta = monto if tipo == "ingreso" else -monto
+            self.conn.execute("UPDATE cuentas SET saldo = saldo + ? WHERE id = ?", (delta, cuenta_id))
+
+        if self.mov_recurrente.get() and tipo in {"gasto", "ingreso"}:
+            d = parse_iso_date(fecha_text)
+            self.conn.execute(
+                """
+                INSERT INTO recurrencias
+                (tipo, nombre, categoria_tipo, descripcion, monto, cuenta_id, inicio_year, inicio_month, ultimo_year, ultimo_month, creado_en)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    tipo,
+                    categoria,
+                    categoria,
+                    descripcion,
+                    monto,
+                    cuenta_id,
+                    d.year,
+                    d.month,
+                    d.year,
+                    d.month,
+                    date.today().isoformat(),
+                ),
+            )
+
+        self.conn.commit()
+        self.mov_monto.set("")
+        self.mov_categoria.set("")
+        self.mov_descripcion.set("")
+        self.mov_recurrente.set(False)
+        self.refresh_all()
+
+    def delete_movimiento(self) -> None:
+        selected = self.mov_tree.selection()
+        if not selected:
+            messagebox.showinfo("Sin selección", "Selecciona un movimiento")
+            return
+
+        mov_id = int(self.mov_tree.item(selected[0], "values")[0])
+        row = self.conn.execute("SELECT tipo, monto, cuenta_id FROM transacciones WHERE id=?", (mov_id,)).fetchone()
+        if row is None:
+            return
+
+        if not messagebox.askyesno("Confirmación", f"¿Eliminar movimiento {mov_id}?"):
+            return
+
+        if row["cuenta_id"]:
+            revert = -row["monto"] if row["tipo"] == "ingreso" else row["monto"]
+            self.conn.execute("UPDATE cuentas SET saldo = saldo + ? WHERE id = ?", (revert, row["cuenta_id"]))
+
+        self.conn.execute("DELETE FROM transacciones WHERE id = ?", (mov_id,))
+        self.conn.commit()
+        self.refresh_all()
+
+    def export_movimientos_csv(self) -> None:
+        import csv
+
+        year, month = self.selected_year_month()
+        out = Path.cwd() / f"movimientos_{year}_{month:02d}.csv"
+        rows = self.get_filtered_movimientos()
+
+        with out.open("w", newline="", encoding="utf-8") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(["id", "fecha", "tipo", "categoria", "cuenta", "monto", "descripcion"])
+            for row in rows:
+                writer.writerow([row["id"], row["fecha"], row["tipo"], row["categoria"], row["cuenta_nombre"] or "", row["monto"], row["descripcion"]])
+
+        messagebox.showinfo("Exportado", f"CSV guardado en:\n{out}")
+
+    def add_account(self) -> None:
+        nombre = self.acc_nombre.get().strip()
+        banco = self.acc_banco.get().strip()
+        tipo = self.acc_tipo.get().strip() or "Corriente"
+        moneda = self.acc_moneda.get().strip() or "EUR"
+
+        try:
+            saldo = float(self.acc_saldo.get().strip())
+        except ValueError:
+            messagebox.showerror("Saldo inválido", "Saldo no numérico")
+            return
+
+        if not nombre or not banco:
+            messagebox.showerror("Campos", "Nombre y banco son obligatorios")
+            return
+
+        self.conn.execute(
+            "INSERT INTO cuentas (nombre,banco,tipo,moneda,saldo,notas,creado_en) VALUES (?,?,?,?,?,'',?)",
+            (nombre, banco, tipo, moneda, saldo, date.today().isoformat()),
+        )
+        self.conn.commit()
+
+        self.acc_nombre.set("")
+        self.acc_banco.set("")
+        self.acc_tipo.set("Corriente")
+        self.acc_moneda.set("EUR")
+        self.acc_saldo.set("0")
+        self.refresh_all()
+
+    def edit_account(self) -> None:
+        selected = self.accounts_tree.selection()
+        if not selected:
+            messagebox.showinfo("Sin selección", "Selecciona una cuenta")
+            return
+
+        account_id = int(self.accounts_tree.item(selected[0], "values")[0])
+        row = self.conn.execute("SELECT * FROM cuentas WHERE id=?", (account_id,)).fetchone()
+        if row is None:
+            return
+
+        dlg = EditAccountDialog(self, row)
+        self.wait_window(dlg)
+        if dlg.result is None:
+            return
+
+        self.conn.execute(
+            "UPDATE cuentas SET nombre=?, banco=?, tipo=?, moneda=?, saldo=? WHERE id=?",
+            (
+                dlg.result["nombre"],
+                dlg.result["banco"],
+                dlg.result["tipo"],
+                dlg.result["moneda"],
+                dlg.result["saldo"],
+                account_id,
+            ),
+        )
+        self.conn.commit()
+        self.refresh_all()
+
+    def delete_account(self) -> None:
+        selected = self.accounts_tree.selection()
+        if not selected:
+            messagebox.showinfo("Sin selección", "Selecciona una cuenta")
+            return
+
+        account_id = int(self.accounts_tree.item(selected[0], "values")[0])
+        if not messagebox.askyesno("Confirmación", "Eliminar cuenta desvinculará movimientos y recurrencias. ¿Continuar?"):
+            return
+
+        self.conn.execute("UPDATE transacciones SET cuenta_id = NULL WHERE cuenta_id = ?", (account_id,))
+        self.conn.execute("UPDATE recurrencias SET cuenta_id = NULL WHERE cuenta_id = ?", (account_id,))
+        self.conn.execute("DELETE FROM cuentas WHERE id = ?", (account_id,))
+        self.conn.commit()
+        self.refresh_all()
+
+    def add_investment(self) -> None:
+        nombre = self.inv_nombre.get().strip()
+        tipo = self.inv_tipo.get().strip() or "Acción"
+        broker = self.inv_broker.get().strip()
+        riesgo = self.inv_riesgo.get().strip() or "Medio"
+        cuenta_id = self.account_map.get(self.inv_cuenta.get())
+
+        try:
+            invertido = float(self.inv_invertido.get().strip())
+        except ValueError:
+            messagebox.showerror("Valores", "El aporte invertido debe ser numérico")
+            return
+
+        if not nombre or invertido <= 0:
+            messagebox.showerror("Valores", "Revisa activo y aporte inicial")
+            return
+
+        actual = invertido
+
+        fecha_text = date.today().isoformat()
+        if invertido > get_available_cash(self.conn):
+            messagebox.showerror("Fondos insuficientes", "No hay dinero disponible para esta inversión (sin crédito)")
+            return
+
+        upsert_investment(
+            self.conn,
+            nombre=nombre,
+            tipo=tipo,
+            broker=broker,
+            invertido_delta=invertido,
+            valor_actual_delta=actual,
+            riesgo=riesgo,
+            fecha_text=fecha_text,
+        )
+
+        if cuenta_id:
+            self.conn.execute("UPDATE cuentas SET saldo = saldo - ? WHERE id = ?", (invertido, cuenta_id))
+
+        if self.inv_recurrente.get():
+            d = date.today()
+            self.conn.execute(
+                """
+                INSERT INTO recurrencias
+                (tipo, nombre, categoria_tipo, descripcion, monto, valor_actual, riesgo, broker, cuenta_id, inicio_year, inicio_month, ultimo_year, ultimo_month, creado_en)
+                VALUES ('inversion', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    nombre,
+                    tipo,
+                    f"Aporte recurrente {nombre}",
+                    invertido,
+                    actual,
+                    riesgo,
+                    broker,
+                    cuenta_id,
+                    d.year,
+                    d.month,
+                    d.year,
+                    d.month,
+                    d.isoformat(),
+                ),
+            )
+
+        self.conn.commit()
+
+        self.inv_nombre.set("")
+        self.inv_broker.set("")
+        self.inv_invertido.set("")
+        self.inv_riesgo.set("Medio")
+        self.inv_recurrente.set(False)
+        self.refresh_all()
+
+    def edit_investment(self) -> None:
+        selected = self.inv_tree.selection()
+        if not selected:
+            messagebox.showinfo("Sin selección", "Selecciona una posición")
+            return
+
+        inv_id = int(self.inv_tree.item(selected[0], "values")[0])
+        row = self.conn.execute("SELECT * FROM inversiones WHERE id=?", (inv_id,)).fetchone()
+        if row is None:
+            return
+
+        dlg = EditInvestmentDialog(self, row)
+        self.wait_window(dlg)
+        if dlg.result is None:
+            return
+
+        clave = normalize_asset(dlg.result["nombre"])
+        exists = self.conn.execute("SELECT id FROM inversiones WHERE clave=? AND id != ?", (clave, inv_id)).fetchone()
+        if exists is not None:
+            messagebox.showerror("Duplicado", "Ya existe una posición para ese activo. Usa nuevos aportes para acumular.")
+            return
+
+        self.conn.execute(
+            """
+            UPDATE inversiones
+            SET nombre=?, clave=?, tipo=?, broker=?, monto_invertido=?, valor_actual=?, riesgo=?, fecha_actualizacion=?
+            WHERE id=?
+            """,
+            (
+                dlg.result["nombre"],
+                clave,
+                dlg.result["tipo"],
+                dlg.result["broker"],
+                dlg.result["monto_invertido"],
+                dlg.result["valor_actual"],
+                dlg.result["riesgo"],
+                date.today().isoformat(),
+                inv_id,
+            ),
+        )
+        self.conn.commit()
+        self.refresh_all()
+
+    def quick_update_investment_value(self) -> None:
+        selected = self.inv_tree.selection()
+        if not selected:
+            messagebox.showinfo("Sin selección", "Selecciona una posición")
+            return
+
+        inv_id = int(self.inv_tree.item(selected[0], "values")[0])
+        row = self.conn.execute("SELECT nombre, valor_actual FROM inversiones WHERE id=?", (inv_id,)).fetchone()
+        if row is None:
+            return
+
+        new_val = simpledialog.askstring("Actualizar cotización", f"Nuevo valor actual de {row['nombre']}:", initialvalue=str(row["valor_actual"]))
+        if new_val is None:
+            return
+        try:
+            value = float(new_val)
+        except ValueError:
+            messagebox.showerror("Valor inválido", "Introduce un número")
+            return
+
+        self.conn.execute("UPDATE inversiones SET valor_actual=?, fecha_actualizacion=? WHERE id=?", (max(value, 0), date.today().isoformat(), inv_id))
+        self.conn.commit()
+        self.refresh_all()
+
+    def delete_investment(self) -> None:
+        selected = self.inv_tree.selection()
+        if not selected:
+            messagebox.showinfo("Sin selección", "Selecciona una inversión")
+            return
+
+        inv_id = int(self.inv_tree.item(selected[0], "values")[0])
+        if not messagebox.askyesno("Confirmación", "¿Eliminar posición de inversión?"):
+            return
+
+        self.conn.execute("DELETE FROM inversiones WHERE id = ?", (inv_id,))
+        self.conn.commit()
+        self.refresh_all()
+
+    def toggle_recurrence(self) -> None:
+        selected = self.rec_tree.selection()
+        if not selected:
+            messagebox.showinfo("Sin selección", "Selecciona una recurrencia")
+            return
+
+        rec_id = int(self.rec_tree.item(selected[0], "values")[0])
+        row = self.conn.execute("SELECT activa FROM recurrencias WHERE id=?", (rec_id,)).fetchone()
+        if row is None:
+            return
+
+        new_val = 0 if row["activa"] else 1
+        self.conn.execute("UPDATE recurrencias SET activa=? WHERE id=?", (new_val, rec_id))
+        self.conn.commit()
+        self.refresh_all()
+
+    def delete_recurrence(self) -> None:
+        selected = self.rec_tree.selection()
+        if not selected:
+            messagebox.showinfo("Sin selección", "Selecciona una recurrencia")
+            return
+
+        rec_id = int(self.rec_tree.item(selected[0], "values")[0])
+        if not messagebox.askyesno("Confirmación", "¿Eliminar regla recurrente?"):
+            return
+
+        self.conn.execute("DELETE FROM recurrencias WHERE id=?", (rec_id,))
+        self.conn.commit()
+        self.refresh_all()
+
+    def apply_recurrences_now(self) -> None:
+        year, month = self.selected_year_month()
+        result = apply_recurring_entries(self.conn, today=date(year, month, 1))
+        self.refresh_all()
+        messagebox.showinfo(
+            "Recurrencias",
+            (
+                f"Periodo aplicado hasta: {year:04d}-{month:02d}\n"
+                f"Generadas: {result.created}\n"
+                f"Saltadas por fondos insuficientes: {result.skipped}"
+            ),
+        )
+
+    def reset_database_with_confirmation(self) -> None:
+        if not messagebox.askyesno(
+            "Resetear base de datos",
+            "Esto borrará TODOS los movimientos, cuentas, inversiones y recurrencias. ¿Deseas continuar?",
+        ):
+            return
+
+        keyword = simpledialog.askstring(
+            "Confirmación final",
+            "Escribe RESET para confirmar el borrado total:",
+        )
+        if keyword != "RESET":
+            messagebox.showinfo("Cancelado", "No se realizaron cambios.")
+            return
+
+        reset_all_data(self.conn)
+        self.refresh_all()
+        messagebox.showinfo("Base de datos reseteada", "Todos los datos fueron eliminados correctamente.")
+
+    def on_close(self) -> None:
+        set_config(self.conn, "theme", self.theme_name)
+        self.conn.close()
+        self.destroy()
+
+
+def main() -> None:
+    app = FinanzasApp()
+    app.mainloop()
+
+
+if __name__ == "__main__":
+    main()
