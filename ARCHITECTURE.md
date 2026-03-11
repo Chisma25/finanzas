@@ -24,3 +24,9 @@ La base actual tenía buena cobertura funcional pero mucha lógica acoplada en `
 
 ## Principio clave
 La simulación se realiza en memoria (sobre snapshot derivado), sin escritura en transacciones reales.
+
+
+## Capa de presentación v2
+- Se mantiene Tkinter como fallback funcional.
+- Se añade `finanzas_gui_qt.py` (PySide6) como shell moderna principal.
+- Ambas UIs comparten core de servicios y SQLite.

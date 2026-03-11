@@ -8,3 +8,5 @@
 - Añadido recomendador mensual basado en reglas.
 - CLI ampliada con comandos v2 (`buckets`, `simular-compra`, `recomendaciones-mes`).
 - GUI adaptada para ejecutar migraciones v2 al iniciar.
+
+- Añadida GUI v2 en PySide6 (`finanzas_gui_qt.py`) reutilizando servicios existentes.

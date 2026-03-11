@@ -132,3 +132,13 @@ Se añadió una base v2 manteniendo compatibilidad con la app actual:
 - `ARCHITECTURE.md`
 - `MIGRATIONS.md`
 - `CHANGELOG.md`
+
+
+## UI v2: decisión de capa visual
+
+Tras evaluar límites prácticos de Tkinter/ttk para acabado “comercializable”, la v2 introduce una **capa visual moderna en PySide6** reutilizando el core ya refactorizado (`mis_finanzas/*`).
+
+- GUI clásica legacy: `python3 finanzas_gui.py`
+- GUI v2 (Qt): `python3 finanzas_gui_qt.py`
+
+> Nota: la GUI Qt usa los mismos servicios y la misma base SQLite local; no reescribe el core ni rompe compatibilidad de datos.
