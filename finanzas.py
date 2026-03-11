@@ -4,20 +4,14 @@
 from __future__ import annotations
 
 import argparse
-import sqlite3
 from datetime import date, datetime
-from pathlib import Path
 
-DB_PATH = Path.home() / ".mis_finanzas.db"
-
-
-def get_connection(db_path: Path = DB_PATH) -> sqlite3.Connection:
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    return conn
+from mis_finanzas.app.services.recommendation_engine import build_monthly_recommendations
+from mis_finanzas.app.services.simulation_engine import simulate_purchase
+from mis_finanzas.infrastructure.db import get_connection, migrate_schema_v2
 
 
-def init_db(conn: sqlite3.Connection) -> None:
+def init_db(conn) -> None:
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS transacciones (
@@ -30,6 +24,7 @@ def init_db(conn: sqlite3.Connection) -> None:
         )
         """
     )
+    migrate_schema_v2(conn)
     conn.commit()
 
 
@@ -131,6 +126,48 @@ def reset_data(args: argparse.Namespace) -> None:
     print("✅ Datos eliminados.")
 
 
+
+def buckets_list(_: argparse.Namespace) -> None:
+    conn = get_connection()
+    init_db(conn)
+    rows = conn.execute("SELECT id,nombre,saldo_reservado_actual,objetivo_monto,activo FROM buckets ORDER BY prioridad,id").fetchall()
+    conn.close()
+    if not rows:
+        print("No hay buckets registrados.")
+        return
+    for r in rows:
+        estado = "activo" if r["activo"] else "inactivo"
+        print(f"[{r['id']}] {r['nombre']} | reservado={formato_eur(r['saldo_reservado_actual'])} | objetivo={formato_eur(r['objetivo_monto'])} | {estado}")
+
+
+def buckets_create(args: argparse.Namespace) -> None:
+    conn = get_connection()
+    init_db(conn)
+    conn.execute(
+        "INSERT INTO buckets (nombre, objetivo_monto, saldo_reservado_actual, prioridad, protegido, activo) VALUES (?,?,?,?,?,1)",
+        (args.nombre, args.objetivo, args.reservado, args.prioridad, 1 if args.protegido else 0),
+    )
+    conn.commit(); conn.close()
+    print("✅ Bucket creado.")
+
+
+def simular_compra(args: argparse.Namespace) -> None:
+    conn = get_connection(); init_db(conn)
+    result = simulate_purchase(conn, nombre=args.nombre, monto=args.monto, tipo_necesidad=args.tipo_necesidad, urgencia=args.urgencia)
+    conn.close()
+    print(f"Veredicto: {result.veredicto}")
+    print(f"Margen restante: {formato_eur(result.margen_restante)}")
+    for p in result.politicas:
+        print(f"- Política {p.nombre}: {p.status.value} ({p.mensaje})")
+
+
+def recomendaciones_mes(args: argparse.Namespace) -> None:
+    conn = get_connection(); init_db(conn)
+    recs = build_monthly_recommendations(conn, year=args.anio, month=args.mes)
+    conn.close()
+    for r in recs:
+        print(f"[{r['severidad']}] {r['titulo']}: {r['mensaje']}")
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Gestor local de finanzas personales")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -157,6 +194,30 @@ def build_parser() -> argparse.ArgumentParser:
     reset_cmd = subparsers.add_parser("reset", help="Borrar todas las transacciones")
     reset_cmd.add_argument("--si", action="store_true", help="Confirmar borrado")
     reset_cmd.set_defaults(func=reset_data)
+
+    rec_month = subparsers.add_parser("recomendaciones-mes", help="Generar recomendaciones del mes")
+    rec_month.add_argument("--anio", type=int, default=date.today().year)
+    rec_month.add_argument("--mes", type=int, default=date.today().month)
+    rec_month.set_defaults(func=recomendaciones_mes)
+
+    sim_buy = subparsers.add_parser("simular-compra", help="Simular compra puntual")
+    sim_buy.add_argument("--nombre", required=True)
+    sim_buy.add_argument("--monto", type=float, required=True)
+    sim_buy.add_argument("--tipo-necesidad", choices=["necesidad","mejora","capricho","inversion_personal"], default="capricho")
+    sim_buy.add_argument("--urgencia", choices=["baja","media","alta"], default="media")
+    sim_buy.set_defaults(func=simular_compra)
+
+    buckets_cmd = subparsers.add_parser("buckets", help="Gestionar buckets")
+    buckets_sub = buckets_cmd.add_subparsers(dest="buckets_cmd", required=True)
+    b_list = buckets_sub.add_parser("listar", help="Listar buckets")
+    b_list.set_defaults(func=buckets_list)
+    b_create = buckets_sub.add_parser("crear", help="Crear bucket")
+    b_create.add_argument("--nombre", required=True)
+    b_create.add_argument("--objetivo", type=float, default=0)
+    b_create.add_argument("--reservado", type=float, default=0)
+    b_create.add_argument("--prioridad", type=int, default=3)
+    b_create.add_argument("--protegido", action="store_true")
+    b_create.set_defaults(func=buckets_create)
 
     return parser
 

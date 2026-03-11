@@ -11,6 +11,8 @@ from datetime import date, datetime
 from pathlib import Path
 from tkinter import messagebox, simpledialog, ttk
 
+from mis_finanzas.infrastructure.db import migrate_schema_v2
+
 DB_PATH = Path.home() / ".mis_finanzas.db"
 MONTH_NAMES = {
     1: "Enero",
@@ -209,6 +211,8 @@ def init_db(conn: sqlite3.Connection) -> None:
         """
     )
     migrate_recurrencias_schema(conn)
+
+    migrate_schema_v2(conn)
 
     conn.execute(
         """

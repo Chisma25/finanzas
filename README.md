@@ -109,3 +109,26 @@ pip install pyinstaller
 ```bash
 pip install pyinstaller
 ```
+
+## V2 (base incremental orientada a decisión)
+
+Se añadió una base v2 manteniendo compatibilidad con la app actual:
+
+- Migraciones no destructivas para nuevas tablas de planificación/escenarios/recomendaciones.
+- Motor de políticas personales (reglas activas con evaluación estructurada).
+- Cálculo centralizado de métricas v2 (liquidez operativa, dinero protegido, compromisos, margen libre real y riesgo).
+- Motor de simulación de compra sin mutar el ledger real.
+- Recomendador mensual explicable basado en reglas.
+
+### Nuevos comandos CLI v2
+
+- `python3 finanzas.py buckets listar`
+- `python3 finanzas.py buckets crear --nombre Emergencia --objetivo 5000 --reservado 600 --protegido`
+- `python3 finanzas.py simular-compra --nombre Portatil --monto 1200 --tipo-necesidad mejora --urgencia media`
+- `python3 finanzas.py recomendaciones-mes --anio 2026 --mes 7`
+
+### Documentación técnica adicional
+
+- `ARCHITECTURE.md`
+- `MIGRATIONS.md`
+- `CHANGELOG.md`
